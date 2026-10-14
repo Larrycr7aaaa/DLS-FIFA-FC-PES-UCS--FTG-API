@@ -311,36 +311,9 @@ const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
 const difficultySelect = document.getElementById("difficultySelect");
 const startGameBtn = document.getElementById("startGameBtn");
 // VARIABLES DEL TEMPORIZADOR (script.js)
-let totalTime = 180; // 3 minutos en segundos
-let timerInterval = null;
-const gameTimerElement = document.getElementById("gameTimer");
+ 
 
-function iniciarTemporizador() {
-    clearInterval(timerInterval);
-    totalTime = 180; // Reiniciar a 3 minutos
 
-    timerInterval = setInterval(() => {
-        totalTime--;
-
-        let minutos = Math.floor(totalTime / 60);
-        let segundos = totalTime % 60;
-
-        // Formato 00:00
-        let minStr = minutos < 10 ? "0" + minutos : minutos;
-        let secStr = segundos < 10 ? "0" + segundos : segundos;
-
-        if (gameTimerElement) {
-            gameTimerElement.textContent = `⏱️ Tiempo: ${minStr}:${secStr}`;
-        }
-
-        // Fin del partido
-        if (totalTime <= 0) {
-            clearInterval(timerInterval);
-            cancelAnimationFrame(gameLoopId);
-            alert(`¡FIN DEL PARTIDO!\nResultado: ${player1.name} ${scoreP1} - ${scoreCpu} ${cpu.name}`);
-        }
-    }, 1000);
-}
 
 // Llama a esta función dentro de reiniciarPartido()
 const canvas = document.getElementById("gameCanvas");
@@ -351,21 +324,7 @@ let imgP1Badge = new Image();
 let imgCpuBadge = new Image();
 // DENTRO DE DIBUJARJUEGO() EN SCRIPT.JS
 
-// 1. Calcular minutos y segundos restantes desde una variable startTime
-let tiempoTranscurrido = Math.floor((Date.now() - gameStartTime) / 1000);
-let tiempoRestante = Math.max(0, 180 - tiempoTranscurrido);
-
-let min = Math.floor(tiempoRestante / 60);
-let seg = tiempoRestante % 60;
-let timeString = `${min < 10 ? '0' : ''}${min}:${seg < 10 ? '0' : ''}${seg}`;
-
-// 2. Dibujar en el Canvas
-ctx.fillStyle = "#ffcc00";
-ctx.font = "bold 18px Poppins, sans-serif";
-ctx.textAlign = "center";
-ctx.fillText(`⏱️ ${timeString}`, canvas.width / 2, 85);
-
-// Fondo usando la imagen FUT.jpg
+sando la imagen FUT.jpg
 let imgPitch = new Image();
 imgPitch.src = './FUT.jpg';
 
