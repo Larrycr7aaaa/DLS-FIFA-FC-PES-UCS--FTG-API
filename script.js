@@ -328,13 +328,19 @@ let keys = {};
 let scoreP1 = 0;
 let scoreCpu = 0;
 
+// Cooldown del PowerShot (20 segundos)
+let lastPowerShotTime = 0;
+const POWERSHOT_COOLDOWN = 20000; // ms
+
 let player1 = {
     x: 150,
     y: 225,
     radius: 20,
     speed: 4,
     name: "Jugador 1",
-    rating: 80
+    rating: 80,
+    lastDirX: 1,
+    lastDirY: 0
 };
 
 let cpu = {
@@ -352,7 +358,8 @@ let ball = {
     radius: 10,
     vx: 0,
     vy: 0,
-    friction: 0.98
+    friction: 0.94, // Fricción mejorada para control
+    maxSpeed: 18   // Límite para evitar atravesar paredes
 };
 
 // Carga TODOS los personajes del JSON al menú desplegable
@@ -371,13 +378,13 @@ function pobladorSelectorJugadores() {
 
 function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => {
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift", "z", "Z"].includes(e.key)) {
             keys[e.key] = true;
         }
     });
 
     window.addEventListener("keyup", e => {
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift", "z", "Z"].includes(e.key)) {
             keys[e.key] = false;
         }
     });
@@ -415,6 +422,7 @@ function reiniciarPartido() {
     resetPosiciones();
     scoreP1 = 0;
     scoreCpu = 0;
+    lastPowerShotTime = 0;
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     bucleJuego();
@@ -440,11 +448,27 @@ function bucleJuego() {
 }
 
 function actualizarJuego() {
-    // 1. Controles de Flechas
-    if (keys["ArrowUp"] && player1.y - player1.radius > 0) player1.y -= player1.speed;
-    if (keys["ArrowDown"] && player1.y + player1.radius < canvas.height) player1.y += player1.speed;
-    if (keys["ArrowLeft"] && player1.x - player1.radius > 0) player1.x -= player1.speed;
-    if (keys["ArrowRight"] && player1.x + player1.radius < canvas.width) player1.x += player1.speed;
+    let dx = 0;
+    let dy = 0;
+
+    // 1. Controles de Flechas P1
+    if (keys["ArrowUp"]) dy -= 1;
+    if (keys["ArrowDown"]) dy += 1;
+    if (keys["ArrowLeft"]) dx -= 1;
+    if (keys["ArrowRight"]) dx += 1;
+
+    if (dx !== 0 || dy !== 0) {
+        let mag = Math.hypot(dx, dy);
+        player1.lastDirX = dx / mag;
+        player1.lastDirY = dy / mag;
+
+        player1.x += (dx / mag) * player1.speed;
+        player1.y += (dy / mag) * player1.speed;
+    }
+
+    // Limitar P1 a la pantalla
+    player1.x = Math.max(player1.radius, Math.min(canvas.width - player1.radius, player1.x));
+    player1.y = Math.max(player1.radius, Math.min(canvas.height - player1.radius, player1.y));
 
     // 2. IA Adaptable CPU
     let targetX = ball.x;
@@ -461,51 +485,93 @@ function actualizarJuego() {
     cpu.x = Math.max(cpu.radius, Math.min(canvas.width - cpu.radius, cpu.x));
     cpu.y = Math.max(cpu.radius, Math.min(canvas.height - cpu.radius, cpu.y));
 
-    // 3. Físicas del Balón
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    ball.vx *= ball.friction;
-    ball.vy *= ball.friction;
+    // 3. Habilidad: Pelota Pegada (Tecla SHIFT)
+    let distP1Ball = Math.hypot(ball.x - player1.x, ball.y - player1.y);
+    let esPelotaPegada = false;
 
-    if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
-        ball.vy *= -1;
+    if (keys["Shift"] && distP1Ball < player1.radius + ball.radius + 15) {
+        esPelotaPegada = true;
+        // Poner pelota justo enfrente del jugador según su dirección de movimiento
+        let holdDist = player1.radius + ball.radius + 2;
+        ball.x = player1.x + player1.lastDirX * holdDist;
+        ball.y = player1.y + player1.lastDirY * holdDist;
+        ball.vx = 0;
+        ball.vy = 0;
     }
 
-    // 4. Colisiones
-    resolverColisionEntidadBalon(player1);
-    resolverColisionEntidadBalon(cpu);
+    // 4. Físicas y Movimiento del Balón (Si no está pegada al jugador)
+    if (!esPelotaPegada) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
 
-    // Chute con la tecla Espacio
+        ball.vx *= ball.friction;
+        ball.vy *= ball.friction;
+
+        // Limitar la velocidad máxima para evitar que traspase las paredes
+        let currentSpeed = Math.hypot(ball.vx, ball.vy);
+        if (currentSpeed > ball.maxSpeed) {
+            ball.vx = (ball.vx / currentSpeed) * ball.maxSpeed;
+            ball.vy = (ball.vy / currentSpeed) * ball.maxSpeed;
+        }
+
+        // Colisión de paredes (Superior e Inferior) con rebote asegurado
+        if (ball.y - ball.radius <= 0) {
+            ball.y = ball.radius;
+            ball.vy = Math.abs(ball.vy) * 0.85;
+        } else if (ball.y + ball.radius >= canvas.height) {
+            ball.y = canvas.height - ball.radius;
+            ball.vy = -Math.abs(ball.vy) * 0.85;
+        }
+
+        // Colisiones con Jugador y CPU
+        resolverColisionEntidadBalon(player1);
+        resolverColisionEntidadBalon(cpu);
+    }
+
+    // 5. Controles de Disparo
+    // Disparo Normal (ESPACIO)
     if (keys[" "]) {
-        let distP1 = Math.hypot(ball.x - player1.x, ball.y - player1.y);
-        if (distP1 < player1.radius + ball.radius + 15) {
+        if (distP1Ball < player1.radius + ball.radius + 20) {
             let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
-            ball.vx = Math.cos(angle) * 12;
-            ball.vy = Math.sin(angle) * 12;
+            ball.vx = Math.cos(angle) * 10;
+            ball.vy = Math.sin(angle) * 10;
         }
     }
 
-    // 5. Anotaciones / Goles
+    // PowerShot Habilidad Especial (Tecla Z cada 20 segundos)
+    const now = Date.now();
+    if ((keys["z"] || keys["Z"]) && (now - lastPowerShotTime >= POWERSHOT_COOLDOWN)) {
+        if (distP1Ball < player1.radius + ball.radius + 25) {
+            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+            ball.vx = Math.cos(angle) * 17.5; // Tiro ultra potente
+            ball.vy = Math.sin(angle) * 17.5;
+            lastPowerShotTime = now;
+        }
+    }
+
+    // 6. Porterías y Goles
     const goalTop = canvas.height / 2 - 60;
     const goalBottom = canvas.height / 2 + 60;
 
+    // Portería Izquierda (CPU Anota)
     if (ball.x - ball.radius <= 0) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreCpu++;
             resetPosiciones();
         } else {
-            ball.vx *= -1;
             ball.x = ball.radius;
+            ball.vx = Math.abs(ball.vx) * 0.85;
         }
     }
 
+    // Portería Derecha (Player 1 Anota)
     if (ball.x + ball.radius >= canvas.width) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreP1++;
             resetPosiciones();
         } else {
-            ball.vx *= -1;
             ball.x = canvas.width - ball.radius;
+            ball.vx = -Math.abs(ball.vx) * 0.85;
         }
     }
 }
@@ -521,6 +587,10 @@ function resolverColisionEntidadBalon(entidad) {
         let fuerza = 5;
         ball.vx = Math.cos(angle) * fuerza;
         ball.vy = Math.sin(angle) * fuerza;
+        
+        // Separar la pelota del jugador para evitar traslapes
+        ball.x = entidad.x + Math.cos(angle) * minDist;
+        ball.y = entidad.y + Math.sin(angle) * minDist;
     }
 }
 
@@ -555,6 +625,20 @@ function dibujarJuego() {
     ctx.font = "bold 22px Poppins, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${cpu.name}`, canvas.width / 2, 35);
+
+    // Indicador del PowerShot (Cooldown)
+    const now = Date.now();
+    const timePassed = now - lastPowerShotTime;
+    ctx.font = "bold 13px Poppins, sans-serif";
+
+    if (timePassed >= POWERSHOT_COOLDOWN) {
+        ctx.fillStyle = "#00ffff";
+        ctx.fillText("⚡ POWERSHOT [Z]: ¡LISTO!", canvas.width / 2, 60);
+    } else {
+        const remaining = Math.ceil((POWERSHOT_COOLDOWN - timePassed) / 1000);
+        ctx.fillStyle = "#ffcc00";
+        ctx.fillText(`⚡ POWERSHOT [Z]: ${remaining}s`, canvas.width / 2, 60);
+    }
 }
 
 function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
