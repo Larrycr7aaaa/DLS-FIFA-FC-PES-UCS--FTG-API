@@ -26,7 +26,7 @@
     <header>
         <div class="logo">
             <div> 
-                <img src="" alt="">
+                <img src="logo.png" alt="Logo DLS" style="height: 50px;">
                 <h1>DLS 26 SPA</h1>
                 <p>Colección Oficial de Cartas</p>
             </div>
@@ -52,6 +52,54 @@
             <button id="searchButton">Buscar</button>
         </div>
     </header>
+
+    <!-- SECCIÓN DE VIDEOJUEGO DE 1 JUGADOR -->
+    <section class="game-section">
+        <div class="game-header">
+            <h2>🎮 Minijuego DLS: 1 Player vs CPU</h2>
+            <p>Usa las <strong>Flechas del Teclado</strong> para moverte y <strong>ESPACIO</strong> para disparar.</p>
+        </div>
+
+        <div class="game-controls-bar">
+            <div class="selector-group">
+                <label for="playerSelect">🎮 Jugador:</label>
+                <select id="playerSelect"></select>
+            </div>
+
+            <div class="selector-group">
+                <label for="p1BadgeSelect">🛡️ Tu Escudo:</label>
+                <select id="p1BadgeSelect">
+                    <option value="RMA.png">Real Madrid (RMA.png)</option>
+                    <option value="MUN.png">Manchester United (MUN.png)</option>
+                    <option value="logo.png">DLS Club (logo.png)</option>
+                </select>
+            </div>
+
+            <div class="selector-group">
+                <label for="cpuBadgeSelect">🤖 Escudo CPU:</label>
+                <select id="cpuBadgeSelect">
+                    <option value="MUN.png">Manchester United (MUN.png)</option>
+                    <option value="RMA.png">Real Madrid (RMA.png)</option>
+                    <option value="logo.png">DLS Club (logo.png)</option>
+                </select>
+            </div>
+
+            <div class="selector-group">
+                <label for="difficultySelect">⚡ Dificultad CPU:</label>
+                <select id="difficultySelect">
+                    <option value="fácil">Fácil</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="difícil">Difícil</option>
+                </select>
+            </div>
+
+            <button id="startGameBtn" class="btn-game">Iniciar Partido ⚽</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
+        </div>
+    </section>
 
     <!-- CONTENIDO PRINCIPAL -->
     <main>
@@ -91,4 +139,5 @@
 
 </body>
 
+</html>
 </html>
