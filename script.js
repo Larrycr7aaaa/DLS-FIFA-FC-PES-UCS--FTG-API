@@ -1,5 +1,5 @@
 // ===========================================
-// DLS 26 CARDS SPA
+// DLS 26 CARDS SPA & MINIJUEGO 1P VS CPU
 // API Local: dls26-cards.json
 // ===========================================
 
@@ -146,7 +146,12 @@ async function cargarDatosAPI() {
         }
 
         jugadoresFiltrados = [...todosLosJugadores];
+        
+        // Carga TODOS los jugadores del JSON al selector del juego
+        pobladorSelectorJugadores();
+
         renderizarPaginaActual();
+        inicializarJuegoCanvas();
     } catch (error) {
         mostrarError("Error cargando la base de datos.");
     }
@@ -294,6 +299,283 @@ function buscarJugador() {
 
     offset = 0;
     renderizarPaginaActual();
+}
+
+// ===========================================
+// LÓGICA Y MOTOR DEL MINIJUEGO 1P VS CPU
+// ===========================================
+
+const playerSelect = document.getElementById("playerSelect");
+const p1BadgeSelect = document.getElementById("p1BadgeSelect");
+const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
+const difficultySelect = document.getElementById("difficultySelect");
+const startGameBtn = document.getElementById("startGameBtn");
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let gameLoopId = null;
+let imgP1Badge = new Image();
+let imgCpuBadge = new Image();
+
+// Fondo usando la imagen FUT.jpg
+let imgPitch = new Image();
+imgPitch.src = './FUT.jpg';
+
+let keys = {};
+
+// Estado del partido
+let scoreP1 = 0;
+let scoreCpu = 0;
+
+let player1 = {
+    x: 150,
+    y: 225,
+    radius: 20,
+    speed: 4,
+    name: "Jugador 1",
+    rating: 80
+};
+
+let cpu = {
+    x: 650,
+    y: 225,
+    radius: 20,
+    speed: 3.2,
+    name: "CPU Bot",
+    reactionRate: 0.05
+};
+
+let ball = {
+    x: 400,
+    y: 225,
+    radius: 10,
+    vx: 0,
+    vy: 0,
+    friction: 0.98
+};
+
+// Carga TODOS los personajes del JSON al menú desplegable
+function pobladorSelectorJugadores() {
+    if (!playerSelect) return;
+    playerSelect.innerHTML = "";
+    
+    todosLosJugadores.forEach((p, index) => {
+        const option = document.createElement("option");
+        option.value = index;
+        const nacion = p.country?.flag ? p.country.flag : '';
+        option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
+        playerSelect.appendChild(option);
+    });
+}
+
+function inicializarJuegoCanvas() {
+    window.addEventListener("keydown", e => {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+            keys[e.key] = true;
+        }
+    });
+
+    window.addEventListener("keyup", e => {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+            keys[e.key] = false;
+        }
+    });
+
+    startGameBtn.addEventListener("click", reiniciarPartido);
+}
+
+function reiniciarPartido() {
+    // Configurar el jugador que escogió la persona
+    const idx = playerSelect.value;
+    const pData = todosLosJugadores[idx] || { name: "Jugador 1", rating: 85 };
+    player1.name = pData.name;
+    player1.rating = pData.rating;
+    
+    // Velocidad proporcional a la media/rating del futbolista elegido
+    player1.speed = 3.5 + (player1.rating / 100) * 2.5;
+
+    // Escudos
+    imgP1Badge.src = p1BadgeSelect.value;
+    imgCpuBadge.src = cpuBadgeSelect.value;
+
+    // Dificultad Adaptable
+    const diff = difficultySelect.value;
+    if (diff === "fácil") {
+        cpu.speed = 2.5;
+        cpu.reactionRate = 0.03;
+    } else if (diff === "normal") {
+        cpu.speed = 3.6;
+        cpu.reactionRate = 0.06;
+    } else { // difícil
+        cpu.speed = 4.8;
+        cpu.reactionRate = 0.1;
+    }
+
+    resetPosiciones();
+    scoreP1 = 0;
+    scoreCpu = 0;
+
+    if (gameLoopId) cancelAnimationFrame(gameLoopId);
+    bucleJuego();
+}
+
+function resetPosiciones() {
+    player1.x = 180;
+    player1.y = canvas.height / 2;
+    
+    cpu.x = canvas.width - 180;
+    cpu.y = canvas.height / 2;
+
+    ball.x = canvas.width / 2;
+    ball.y = canvas.height / 2;
+    ball.vx = 0;
+    ball.vy = 0;
+}
+
+function bucleJuego() {
+    actualizarJuego();
+    dibujarJuego();
+    gameLoopId = requestAnimationFrame(bucleJuego);
+}
+
+function actualizarJuego() {
+    // 1. Controles de Flechas
+    if (keys["ArrowUp"] && player1.y - player1.radius > 0) player1.y -= player1.speed;
+    if (keys["ArrowDown"] && player1.y + player1.radius < canvas.height) player1.y += player1.speed;
+    if (keys["ArrowLeft"] && player1.x - player1.radius > 0) player1.x -= player1.speed;
+    if (keys["ArrowRight"] && player1.x + player1.radius < canvas.width) player1.x += player1.speed;
+
+    // 2. IA Adaptable CPU
+    let targetX = ball.x;
+    let targetY = ball.y;
+
+    if (ball.x < canvas.width / 2) {
+        targetX = canvas.width - 120;
+        targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
+    }
+
+    cpu.x += (targetX - cpu.x) * cpu.reactionRate;
+    cpu.y += (targetY - cpu.y) * cpu.reactionRate;
+
+    cpu.x = Math.max(cpu.radius, Math.min(canvas.width - cpu.radius, cpu.x));
+    cpu.y = Math.max(cpu.radius, Math.min(canvas.height - cpu.radius, cpu.y));
+
+    // 3. Físicas del Balón
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    ball.vx *= ball.friction;
+    ball.vy *= ball.friction;
+
+    if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
+        ball.vy *= -1;
+    }
+
+    // 4. Colisiones
+    resolverColisionEntidadBalon(player1);
+    resolverColisionEntidadBalon(cpu);
+
+    // Chute con la tecla Espacio
+    if (keys[" "]) {
+        let distP1 = Math.hypot(ball.x - player1.x, ball.y - player1.y);
+        if (distP1 < player1.radius + ball.radius + 15) {
+            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+            ball.vx = Math.cos(angle) * 12;
+            ball.vy = Math.sin(angle) * 12;
+        }
+    }
+
+    // 5. Anotaciones / Goles
+    const goalTop = canvas.height / 2 - 60;
+    const goalBottom = canvas.height / 2 + 60;
+
+    if (ball.x - ball.radius <= 0) {
+        if (ball.y >= goalTop && ball.y <= goalBottom) {
+            scoreCpu++;
+            resetPosiciones();
+        } else {
+            ball.vx *= -1;
+            ball.x = ball.radius;
+        }
+    }
+
+    if (ball.x + ball.radius >= canvas.width) {
+        if (ball.y >= goalTop && ball.y <= goalBottom) {
+            scoreP1++;
+            resetPosiciones();
+        } else {
+            ball.vx *= -1;
+            ball.x = canvas.width - ball.radius;
+        }
+    }
+}
+
+function resolverColisionEntidadBalon(entidad) {
+    let dx = ball.x - entidad.x;
+    let dy = ball.y - entidad.y;
+    let distancia = Math.hypot(dx, dy);
+    let minDist = entidad.radius + ball.radius;
+
+    if (distancia < minDist) {
+        let angle = Math.atan2(dy, dx);
+        let fuerza = 5;
+        ball.vx = Math.cos(angle) * fuerza;
+        ball.vy = Math.sin(angle) * fuerza;
+    }
+}
+
+function dibujarJuego() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Fondo usando la imagen de cancha (FUT.jpg)
+    if (imgPitch.complete && imgPitch.naturalWidth > 0) {
+        ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = "#2e8b57";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Dibujar Jugador 1
+    dibujarJugadorCanvas(player1, imgP1Badge, "#00ffff");
+
+    // Dibujar CPU
+    dibujarJugadorCanvas(cpu, imgCpuBadge, "#ff0055");
+
+    // Dibujar Balón
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Marcador
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px Poppins, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${cpu.name}`, canvas.width / 2, 35);
+}
+
+function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
+    ctx.clip();
+
+    if (imgEscudo.complete && imgEscudo.naturalWidth > 0) {
+        ctx.drawImage(imgEscudo, entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
+    } else {
+        ctx.fillStyle = colorBorde;
+        ctx.fillRect(entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
+    }
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = colorBorde;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 }
 
 // ==============================
