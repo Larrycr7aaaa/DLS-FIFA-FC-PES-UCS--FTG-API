@@ -53,31 +53,39 @@
         </div>
     </header>
 
-    <!-- SECCIÓN DE VIDEOJUEGO DE 1 JUGADOR -->
+    <!-- SECCIÓN DE VIDEOJUEGO -->
     <section class="game-section">
         <div class="game-header">
-            <!-- DENTRO DE CARDS.HTML EN LA SECCIÓN DEL JUEGO -->
-<div class="game-header">
-    <h2>🎮 Minijuego DLS: 1 Player vs CPU</h2>
-    <p><strong>Flechas:</strong> Moverse | <strong>ESPACIO:</strong> Chutar | <strong>SHIFT:</strong> Pelota Pegada | <strong>Z:</strong> PowerShot (cada 20s)</p>
-    
-    <!-- AÑADIR AQUÍ EL RELOJ TEMPORIZADOR -->
-    <div id="gameTimer" style="font-size: 1.5rem; font-weight: bold; color: #ffcc00; margin: 10px 0;">
-        ⏱️ Tiempo: 03:00
-    </div>
-</div>
-            <h2>🎮 Minijuego DLS: 1 Player vs CPU</h2>
-            <p><strong>Flechas:</strong> Moverse | <strong>ESPACIO:</strong> Chutar | <strong>SHIFT:</strong> Pelota Pegada | <strong>Z:</strong> PowerShot (cada 20s)</p>
+            <h2>🎮 Minijuego DLS: Fútbol Arcade</h2>
+            <p><strong>P1 (Azul):</strong> Flechas (Mover) | Espacio (Tiro) | Shift (Pegada) | Q (Nitro) | X (Defensa) | Z (PowerShot)</p>
+            <p><strong>P2 (Rojo):</strong> WASD (Mover) | F (Tiro) | G (Pegada) | E (Nitro) | R (Defensa) | T (PowerShot)</p>
+            
+            <div id="gameTimer" style="font-size: 1.5rem; font-weight: bold; color: #ffcc00; margin: 10px 0;">
+                ⏱️ Tiempo: 03:00
+            </div>
         </div>
 
         <div class="game-controls-bar">
             <div class="selector-group">
-                <label for="playerSelect">🎮 Jugador:</label>
-                <select id="playerSelect"></select>
+                <label for="gameModeSelect">👥 Modo:</label>
+                <select id="gameModeSelect">
+                    <option value="1P">1 Jugador vs CPU</option>
+                    <option value="2P">2 Jugadores (Local)</option>
+                </select>
             </div>
 
             <div class="selector-group">
-                <label for="p1BadgeSelect">🛡️ Tu Escudo:</label>
+                <label for="playerSelect">🎮 Jugador 1:</label>
+                <select id="playerSelect"></select>
+            </div>
+
+            <div class="selector-group" id="p2PlayerGroup" style="display: none;">
+                <label for="player2Select">🎮 Jugador 2:</label>
+                <select id="player2Select"></select>
+            </div>
+
+            <div class="selector-group">
+                <label for="p1BadgeSelect">🛡️ Escudo P1:</label>
                 <select id="p1BadgeSelect">
                     <option value="RMA.png">Real Madrid (RMA.png)</option>
                     <option value="MUN.png">Manchester United (MUN.png)</option>
@@ -86,7 +94,7 @@
             </div>
 
             <div class="selector-group">
-                <label for="cpuBadgeSelect">🤖 Escudo CPU:</label>
+                <label for="cpuBadgeSelect">🛡️ Escudo P2/CPU:</label>
                 <select id="cpuBadgeSelect">
                     <option value="MUN.png">Manchester United (MUN.png)</option>
                     <option value="RMA.png">Real Madrid (RMA.png)</option>
@@ -94,12 +102,12 @@
                 </select>
             </div>
 
-            <div class="selector-group">
+            <div class="selector-group" id="difficultyGroup">
                 <label for="difficultySelect">⚡ Dificultad CPU:</label>
                 <select id="difficultySelect">
-                    <option value="fácil">Fácil</option>
-                    <option value="normal" selected>Normal</option>
-                    <option value="difícil">Difícil</option>
+                    <option value="fácil">Fácil (Solo Defensa)</option>
+                    <option value="normal" selected>Normal (Control, Nitro, Defensa)</option>
+                    <option value="difícil">Difícil (Todas las Skills)</option>
                 </select>
             </div>
 
