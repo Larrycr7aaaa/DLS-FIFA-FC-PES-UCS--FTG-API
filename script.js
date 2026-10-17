@@ -1,5 +1,5 @@
 // ===========================================
-// DLS 26 CARDS SPA & MINIJUEGO 1P VS CPU
+// DLS 26 CARDS SPA & MINIJUEGO
 // API Local: dls26-cards.json
 // ===========================================
 
@@ -137,7 +137,6 @@ async function cargarDatosAPI() {
 
         const data = await respuesta.json();
 
-        // Cargar Playlist si está en el JSON
         if (data.playlist) {
             inicializarReproductor(data.playlist);
             todosLosJugadores = data.players || [];
@@ -147,9 +146,7 @@ async function cargarDatosAPI() {
 
         jugadoresFiltrados = [...todosLosJugadores];
         
-        // Carga TODOS los jugadores del JSON al selector del juego
         pobladorSelectorJugadores();
-
         renderizarPaginaActual();
         inicializarJuegoCanvas();
     } catch (error) {
@@ -302,60 +299,67 @@ function buscarJugador() {
 }
 
 // ===========================================
-// LÓGICA Y MOTOR DEL MINIJUEGO 1P VS CPU
+// LÓGICA Y MOTOR DEL MINIJUEGO DLS
 // ===========================================
 
+const gameModeSelect = document.getElementById("gameModeSelect");
 const playerSelect = document.getElementById("playerSelect");
+const player2Select = document.getElementById("player2Select");
+const p2PlayerGroup = document.getElementById("p2PlayerGroup");
+const difficultyGroup = document.getElementById("difficultyGroup");
 const p1BadgeSelect = document.getElementById("p1BadgeSelect");
 const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
 const difficultySelect = document.getElementById("difficultySelect");
 const startGameBtn = document.getElementById("startGameBtn");
-// VARIABLES DEL TEMPORIZADOR (script.js)
- 
+const gameTimerElement = document.getElementById("gameTimer");
 
-
-
-// Llama a esta función dentro de reiniciarPartido()
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 let gameLoopId = null;
+let timerInterval = null;
+let matchTime = 180; // 3 minutos
+
 let imgP1Badge = new Image();
 let imgCpuBadge = new Image();
-// DENTRO DE DIBUJARJUEGO() EN SCRIPT.JS
 
-sando la imagen FUT.jpg
 let imgPitch = new Image();
 imgPitch.src = './FUT.jpg';
 
 let keys = {};
 
-// Estado del partido
 let scoreP1 = 0;
 let scoreCpu = 0;
-
-// Cooldown del PowerShot (20 segundos)
-let lastPowerShotTime = 0;
-const POWERSHOT_COOLDOWN = 20000; // ms
+const POWERSHOT_COOLDOWN = 20000; // 20s
 
 let player1 = {
-    x: 150,
+    x: 180,
     y: 225,
     radius: 20,
+    baseSpeed: 4,
     speed: 4,
     name: "Jugador 1",
     rating: 80,
     lastDirX: 1,
-    lastDirY: 0
+    lastDirY: 0,
+    nitro: 100,
+    lastPowerShot: 0
 };
 
-let cpu = {
-    x: 650,
+let p2OrCpu = {
+    x: 620,
     y: 225,
     radius: 20,
-    speed: 3.2,
+    baseSpeed: 3.5,
+    speed: 3.5,
     name: "CPU Bot",
-    reactionRate: 0.05
+    rating: 80,
+    lastDirX: -1,
+    lastDirY: 0,
+    nitro: 100,
+    lastPowerShot: 0,
+    reactionRate: 0.05,
+    isHuman: false
 };
 
 let ball = {
@@ -364,34 +368,44 @@ let ball = {
     radius: 10,
     vx: 0,
     vy: 0,
-    friction: 0.94, // Fricción mejorada para control
-    maxSpeed: 18   // Límite para evitar atravesar paredes
+    friction: 0.94,
+    maxSpeed: 18
 };
 
-// Carga TODOS los personajes del JSON al menú desplegable
 function pobladorSelectorJugadores() {
     if (!playerSelect) return;
     playerSelect.innerHTML = "";
+    if (player2Select) player2Select.innerHTML = "";
     
     todosLosJugadores.forEach((p, index) => {
         const option = document.createElement("option");
         option.value = index;
         const nacion = p.country?.flag ? p.country.flag : '';
         option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
+        
         playerSelect.appendChild(option);
-    });
-}
-
-function inicializarJuegoCanvas() {
-    window.addEventListener("keydown", e => {
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift", "z", "Z"].includes(e.key)) {
-            keys[e.key] = true;
+        if (player2Select) {
+            const opt2 = option.cloneNode(true);
+            player2Select.appendChild(opt2);
         }
     });
 
-    window.addEventListener("keyup", e => {
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift", "z", "Z"].includes(e.key)) {
-            keys[e.key] = false;
+    if (player2Select && player2Select.options.length > 1) {
+        player2Select.selectedIndex = 1;
+    }
+}
+
+function inicializarJuegoCanvas() {
+    window.addEventListener("keydown", e => { keys[e.key] = true; });
+    window.addEventListener("keyup", e => { keys[e.key] = false; });
+
+    gameModeSelect.addEventListener("change", () => {
+        if (gameModeSelect.value === "2P") {
+            p2PlayerGroup.style.display = "flex";
+            difficultyGroup.style.display = "none";
+        } else {
+            p2PlayerGroup.style.display = "none";
+            difficultyGroup.style.display = "flex";
         }
     });
 
@@ -399,47 +413,81 @@ function inicializarJuegoCanvas() {
 }
 
 function reiniciarPartido() {
-    // Configurar el jugador que escogió la persona
-    const idx = playerSelect.value;
-    const pData = todosLosJugadores[idx] || { name: "Jugador 1", rating: 85 };
-    player1.name = pData.name;
-    player1.rating = pData.rating;
-    
-    // Velocidad proporcional a la media/rating del futbolista elegido
-    player1.speed = 3.5 + (player1.rating / 100) * 2.5;
+    // Configurar P1
+    const p1Idx = playerSelect.value;
+    const p1Data = todosLosJugadores[p1Idx] || { name: "Jugador 1", rating: 85 };
+    player1.name = p1Data.name;
+    player1.rating = p1Data.rating;
+    player1.baseSpeed = 3.5 + (player1.rating / 100) * 2.2;
+    player1.nitro = 100;
+    player1.lastPowerShot = 0;
 
-    // Escudos
     imgP1Badge.src = p1BadgeSelect.value;
     imgCpuBadge.src = cpuBadgeSelect.value;
 
-    // Dificultad Adaptable
-    const diff = difficultySelect.value;
-    if (diff === "fácil") {
-        cpu.speed = 2.5;
-        cpu.reactionRate = 0.03;
-    } else if (diff === "normal") {
-        cpu.speed = 3.6;
-        cpu.reactionRate = 0.06;
-    } else { // difícil
-        cpu.speed = 4.8;
-        cpu.reactionRate = 0.1;
+    // Configurar P2 o CPU
+    if (gameModeSelect.value === "2P") {
+        p2OrCpu.isHuman = true;
+        const p2Idx = player2Select.value;
+        const p2Data = todosLosJugadores[p2Idx] || { name: "Jugador 2", rating: 85 };
+        p2OrCpu.name = p2Data.name;
+        p2OrCpu.rating = p2Data.rating;
+        p2OrCpu.baseSpeed = 3.5 + (p2OrCpu.rating / 100) * 2.2;
+    } else {
+        p2OrCpu.isHuman = false;
+        p2OrCpu.name = "CPU Bot";
+        const diff = difficultySelect.value;
+        if (diff === "fácil") {
+            p2OrCpu.baseSpeed = 2.5;
+            p2OrCpu.reactionRate = 0.03;
+        } else if (diff === "normal") {
+            p2OrCpu.baseSpeed = 3.6;
+            p2OrCpu.reactionRate = 0.06;
+        } else { // difícil
+            p2OrCpu.baseSpeed = 4.8;
+            p2OrCpu.reactionRate = 0.1;
+        }
     }
+    p2OrCpu.nitro = 100;
+    p2OrCpu.lastPowerShot = 0;
 
     resetPosiciones();
     scoreP1 = 0;
     scoreCpu = 0;
-    lastPowerShotTime = 0;
+
+    iniciarTemporizador();
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     bucleJuego();
+}
+
+function iniciarTemporizador() {
+    clearInterval(timerInterval);
+    matchTime = 180; // 3 minutos
+
+    timerInterval = setInterval(() => {
+        matchTime--;
+
+        let m = Math.floor(matchTime / 60);
+        let s = matchTime % 60;
+        let str = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+
+        if (gameTimerElement) gameTimerElement.textContent = str;
+
+        if (matchTime <= 0) {
+            clearInterval(timerInterval);
+            cancelAnimationFrame(gameLoopId);
+            alert(`¡FIN DEL PARTIDO!\nResultado: ${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`);
+        }
+    }, 1000);
 }
 
 function resetPosiciones() {
     player1.x = 180;
     player1.y = canvas.height / 2;
     
-    cpu.x = canvas.width - 180;
-    cpu.y = canvas.height / 2;
+    p2OrCpu.x = canvas.width - 180;
+    p2OrCpu.y = canvas.height / 2;
 
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
@@ -454,73 +502,150 @@ function bucleJuego() {
 }
 
 function actualizarJuego() {
-    let dx = 0;
-    let dy = 0;
+    const now = Date.now();
 
-    // 1. Controles de Flechas P1
-    if (keys["ArrowUp"]) dy -= 1;
-    if (keys["ArrowDown"]) dy += 1;
-    if (keys["ArrowLeft"]) dx -= 1;
-    if (keys["ArrowRight"]) dx += 1;
+    // --- CONTROLES Y MOVIMIENTO PLAYER 1 ---
+    let dx1 = 0, dy1 = 0;
+    if (keys["ArrowUp"]) dy1 -= 1;
+    if (keys["ArrowDown"]) dy1 += 1;
+    if (keys["ArrowLeft"]) dx1 -= 1;
+    if (keys["ArrowRight"]) dx1 += 1;
 
-    if (dx !== 0 || dy !== 0) {
-        let mag = Math.hypot(dx, dy);
-        player1.lastDirX = dx / mag;
-        player1.lastDirY = dy / mag;
-
-        player1.x += (dx / mag) * player1.speed;
-        player1.y += (dy / mag) * player1.speed;
+    // Nitro (P1: Q)
+    if (keys["q"] || keys["Q"]) {
+        if (player1.nitro > 0) {
+            player1.speed = player1.baseSpeed * 1.6;
+            player1.nitro = Math.max(0, player1.nitro - 0.8);
+        } else {
+            player1.speed = player1.baseSpeed;
+        }
+    } else {
+        player1.speed = player1.baseSpeed;
+        player1.nitro = Math.min(100, player1.nitro + 0.2); // Recarga progresiva
     }
 
-    // Limitar P1 a la pantalla
+    if (dx1 !== 0 || dy1 !== 0) {
+        let mag = Math.hypot(dx1, dy1);
+        player1.lastDirX = dx1 / mag;
+        player1.lastDirY = dy1 / mag;
+        player1.x += (dx1 / mag) * player1.speed;
+        player1.y += (dy1 / mag) * player1.speed;
+    }
+
     player1.x = Math.max(player1.radius, Math.min(canvas.width - player1.radius, player1.x));
     player1.y = Math.max(player1.radius, Math.min(canvas.height - player1.radius, player1.y));
 
-    // 2. IA Adaptable CPU
-    let targetX = ball.x;
-    let targetY = ball.y;
+    // --- CONTROLES Y MOVIMIENTO PLAYER 2 O CPU ---
+    if (p2OrCpu.isHuman) {
+        let dx2 = 0, dy2 = 0;
+        if (keys["w"] || keys["W"]) dy2 -= 1;
+        if (keys["s"] || keys["S"]) dy2 += 1;
+        if (keys["a"] || keys["A"]) dx2 -= 1;
+        if (keys["d"] || keys["D"]) dx2 += 1;
 
-    if (ball.x < canvas.width / 2) {
-        targetX = canvas.width - 120;
-        targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
+        // Nitro (P2: E)
+        if (keys["e"] || keys["E"]) {
+            if (p2OrCpu.nitro > 0) {
+                p2OrCpu.speed = p2OrCpu.baseSpeed * 1.6;
+                p2OrCpu.nitro = Math.max(0, p2OrCpu.nitro - 0.8);
+            } else {
+                p2OrCpu.speed = p2OrCpu.baseSpeed;
+            }
+        } else {
+            p2OrCpu.speed = p2OrCpu.baseSpeed;
+            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
+        }
+
+        if (dx2 !== 0 || dy2 !== 0) {
+            let mag = Math.hypot(dx2, dy2);
+            p2OrCpu.lastDirX = dx2 / mag;
+            p2OrCpu.lastDirY = dy2 / mag;
+            p2OrCpu.x += (dx2 / mag) * p2OrCpu.speed;
+            p2OrCpu.y += (dy2 / mag) * p2OrCpu.speed;
+        }
+    } else {
+        // Lógica Adaptable de la CPU según dificultad
+        const diff = difficultySelect.value;
+        let targetX = ball.x;
+        let targetY = ball.y;
+
+        if (ball.x < canvas.width / 2) {
+            targetX = canvas.width - 120;
+            targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
+        }
+
+        // Dificultad Normal/Difícil usan Nitro si la pelota está lejos
+        if ((diff === "normal" || diff === "difícil") && Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y) > 150 && p2OrCpu.nitro > 20) {
+            p2OrCpu.speed = p2OrCpu.baseSpeed * 1.5;
+            p2OrCpu.nitro -= 0.5;
+        } else {
+            p2OrCpu.speed = p2OrCpu.baseSpeed;
+            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
+        }
+
+        p2OrCpu.x += (targetX - p2OrCpu.x) * p2OrCpu.reactionRate;
+        p2OrCpu.y += (targetY - p2OrCpu.y) * p2OrCpu.reactionRate;
     }
 
-    cpu.x += (targetX - cpu.x) * cpu.reactionRate;
-    cpu.y += (targetY - cpu.y) * cpu.reactionRate;
+    p2OrCpu.x = Math.max(p2OrCpu.radius, Math.min(canvas.width - p2OrCpu.radius, p2OrCpu.x));
+    p2OrCpu.y = Math.max(p2OrCpu.radius, Math.min(canvas.height - p2OrCpu.radius, p2OrCpu.y));
 
-    cpu.x = Math.max(cpu.radius, Math.min(canvas.width - cpu.radius, cpu.x));
-    cpu.y = Math.max(cpu.radius, Math.min(canvas.height - cpu.radius, cpu.y));
-
-    // 3. Habilidad: Pelota Pegada (Tecla SHIFT)
+    // --- PELOTA PEGADA (CONTROL) ---
     let distP1Ball = Math.hypot(ball.x - player1.x, ball.y - player1.y);
-    let esPelotaPegada = false;
+    let distP2Ball = Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y);
+    let pelotaPegada = false;
 
+    // P1 Control (Shift)
     if (keys["Shift"] && distP1Ball < player1.radius + ball.radius + 15) {
-        esPelotaPegada = true;
-        // Poner pelota justo enfrente del jugador según su dirección de movimiento
-        let holdDist = player1.radius + ball.radius + 2;
-        ball.x = player1.x + player1.lastDirX * holdDist;
-        ball.y = player1.y + player1.lastDirY * holdDist;
-        ball.vx = 0;
-        ball.vy = 0;
+        pelotaPegada = true;
+        ball.x = player1.x + player1.lastDirX * (player1.radius + ball.radius + 2);
+        ball.y = player1.y + player1.lastDirY * (player1.radius + ball.radius + 2);
+        ball.vx = 0; ball.vy = 0;
+    }
+    
+    // P2 Control (G) o CPU Normal/Difícil
+    const cpuCanControl = (!p2OrCpu.isHuman && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
+    if ((keys["g"] || keys["G"] || cpuCanControl) && !pelotaPegada && distP2Ball < p2OrCpu.radius + ball.radius + 15) {
+        pelotaPegada = true;
+        ball.x = p2OrCpu.x + p2OrCpu.lastDirX * (p2OrCpu.radius + ball.radius + 2);
+        ball.y = p2OrCpu.y + p2OrCpu.lastDirY * (p2OrCpu.radius + ball.radius + 2);
+        ball.vx = 0; ball.vy = 0;
     }
 
-    // 4. Físicas y Movimiento del Balón (Si no está pegada al jugador)
-    if (!esPelotaPegada) {
+    // --- DEFENSA / ENTRADA (P1: X | P2: R | CPU en Todas las Dificultades) ---
+    // P1 Defensa (Quitar pelota a P2)
+    if (keys["x"] || keys["X"]) {
+        if (Math.hypot(p2OrCpu.x - player1.x, p2OrCpu.y - player1.y) < player1.radius + p2OrCpu.radius + 20) {
+            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+            ball.vx = Math.cos(angle) * 12;
+            ball.vy = Math.sin(angle) * 12;
+        }
+    }
+
+    // P2 o CPU Defensa
+    const cpuDefend = (!p2OrCpu.isHuman); // CPU usa defensa en todas las dificultades
+    if (keys["r"] || keys["R"] || cpuDefend) {
+        if (Math.hypot(player1.x - p2OrCpu.x, player1.y - p2OrCpu.y) < player1.radius + p2OrCpu.radius + 20) {
+            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
+            ball.vx = Math.cos(angle) * 12;
+            ball.vy = Math.sin(angle) * 12;
+        }
+    }
+
+    // --- FÍSICAS DEL BALÓN ---
+    if (!pelotaPegada) {
         ball.x += ball.vx;
         ball.y += ball.vy;
-
         ball.vx *= ball.friction;
         ball.vy *= ball.friction;
 
-        // Limitar la velocidad máxima para evitar que traspase las paredes
-        let currentSpeed = Math.hypot(ball.vx, ball.vy);
-        if (currentSpeed > ball.maxSpeed) {
-            ball.vx = (ball.vx / currentSpeed) * ball.maxSpeed;
-            ball.vy = (ball.vy / currentSpeed) * ball.maxSpeed;
+        let spd = Math.hypot(ball.vx, ball.vy);
+        if (spd > ball.maxSpeed) {
+            ball.vx = (ball.vx / spd) * ball.maxSpeed;
+            ball.vy = (ball.vy / spd) * ball.maxSpeed;
         }
 
-        // Colisión de paredes (Superior e Inferior) con rebote asegurado
+        // Rebotes
         if (ball.y - ball.radius <= 0) {
             ball.y = ball.radius;
             ball.vy = Math.abs(ball.vy) * 0.85;
@@ -529,37 +654,48 @@ function actualizarJuego() {
             ball.vy = -Math.abs(ball.vy) * 0.85;
         }
 
-        // Colisiones con Jugador y CPU
         resolverColisionEntidadBalon(player1);
-        resolverColisionEntidadBalon(cpu);
+        resolverColisionEntidadBalon(p2OrCpu);
     }
 
-    // 5. Controles de Disparo
-    // Disparo Normal (ESPACIO)
-    if (keys[" "]) {
-        if (distP1Ball < player1.radius + ball.radius + 20) {
-            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+    // --- DISPAROS Y POWERSHOT ---
+    // P1 Disparo (Espacio)
+    if (keys[" "] && distP1Ball < player1.radius + ball.radius + 20) {
+        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+        ball.vx = Math.cos(angle) * 10;
+        ball.vy = Math.sin(angle) * 10;
+    }
+
+    // P2 Disparo (F)
+    if (keys["f"] || keys["F"]) {
+        if (distP2Ball < p2OrCpu.radius + ball.radius + 20) {
+            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
             ball.vx = Math.cos(angle) * 10;
             ball.vy = Math.sin(angle) * 10;
         }
     }
 
-    // PowerShot Habilidad Especial (Tecla Z cada 20 segundos)
-    const now = Date.now();
-    if ((keys["z"] || keys["Z"]) && (now - lastPowerShotTime >= POWERSHOT_COOLDOWN)) {
-        if (distP1Ball < player1.radius + ball.radius + 25) {
-            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
-            ball.vx = Math.cos(angle) * 17.5; // Tiro ultra potente
-            ball.vy = Math.sin(angle) * 17.5;
-            lastPowerShotTime = now;
-        }
+    // P1 PowerShot (Z)
+    if ((keys["z"] || keys["Z"]) && (now - player1.lastPowerShot >= POWERSHOT_COOLDOWN) && distP1Ball < player1.radius + ball.radius + 25) {
+        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+        ball.vx = Math.cos(angle) * 17.5;
+        ball.vy = Math.sin(angle) * 17.5;
+        player1.lastPowerShot = now;
     }
 
-    // 6. Porterías y Goles
+    // P2 PowerShot (T) o CPU Difícil
+    const cpuPowerShot = (!p2OrCpu.isHuman && difficultySelect.value === "difícil" && ball.x > canvas.width * 0.6);
+    if (((keys["t"] || keys["T"]) || cpuPowerShot) && (now - p2OrCpu.lastPowerShot >= POWERSHOT_COOLDOWN) && distP2Ball < p2OrCpu.radius + ball.radius + 25) {
+        let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
+        ball.vx = Math.cos(angle) * 17.5;
+        ball.vy = Math.sin(angle) * 17.5;
+        p2OrCpu.lastPowerShot = now;
+    }
+
+    // --- GOLES ---
     const goalTop = canvas.height / 2 - 60;
     const goalBottom = canvas.height / 2 + 60;
 
-    // Portería Izquierda (CPU Anota)
     if (ball.x - ball.radius <= 0) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreCpu++;
@@ -570,7 +706,6 @@ function actualizarJuego() {
         }
     }
 
-    // Portería Derecha (Player 1 Anota)
     if (ball.x + ball.radius >= canvas.width) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreP1++;
@@ -593,8 +728,6 @@ function resolverColisionEntidadBalon(entidad) {
         let fuerza = 5;
         ball.vx = Math.cos(angle) * fuerza;
         ball.vy = Math.sin(angle) * fuerza;
-        
-        // Separar la pelota del jugador para evitar traslapes
         ball.x = entidad.x + Math.cos(angle) * minDist;
         ball.y = entidad.y + Math.sin(angle) * minDist;
     }
@@ -603,7 +736,6 @@ function resolverColisionEntidadBalon(entidad) {
 function dibujarJuego() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Fondo usando la imagen de cancha (FUT.jpg)
     if (imgPitch.complete && imgPitch.naturalWidth > 0) {
         ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
     } else {
@@ -611,11 +743,9 @@ function dibujarJuego() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Dibujar Jugador 1
+    // Dibujar Jugadores
     dibujarJugadorCanvas(player1, imgP1Badge, "#00ffff");
-
-    // Dibujar CPU
-    dibujarJugadorCanvas(cpu, imgCpuBadge, "#ff0055");
+    dibujarJugadorCanvas(p2OrCpu, imgCpuBadge, "#ff0055");
 
     // Dibujar Balón
     ctx.beginPath();
@@ -630,21 +760,17 @@ function dibujarJuego() {
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 22px Poppins, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${cpu.name}`, canvas.width / 2, 35);
+    ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`, canvas.width / 2, 35);
 
-    // Indicador del PowerShot (Cooldown)
-    const now = Date.now();
-    const timePassed = now - lastPowerShotTime;
-    ctx.font = "bold 13px Poppins, sans-serif";
+    // Indicadores de Nitro
+    ctx.fillStyle = "#00ffff";
+    ctx.fillRect(20, 20, player1.nitro * 1.2, 8);
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(20, 20, 120, 8);
 
-    if (timePassed >= POWERSHOT_COOLDOWN) {
-        ctx.fillStyle = "#00ffff";
-        ctx.fillText("⚡ POWERSHOT [Z]: ¡LISTO!", canvas.width / 2, 60);
-    } else {
-        const remaining = Math.ceil((POWERSHOT_COOLDOWN - timePassed) / 1000);
-        ctx.fillStyle = "#ffcc00";
-        ctx.fillText(`⚡ POWERSHOT [Z]: ${remaining}s`, canvas.width / 2, 60);
-    }
+    ctx.fillStyle = "#ff0055";
+    ctx.fillRect(canvas.width - 140, 20, p2OrCpu.nitro * 1.2, 8);
+    ctx.strokeRect(canvas.width - 140, 20, 120, 8);
 }
 
 function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
