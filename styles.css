@@ -152,9 +152,9 @@ header {
 }
 
 .game-header p {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: #ccc;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
 }
 
 .game-controls-bar {
@@ -298,7 +298,7 @@ main {
 }
 
 /* ================================= */
-/* BOTONES DE TARJETA (DEGRADADO CIAN-ROJO 90º) */
+/* BOTONES DE TARJETA */
 /* ================================= */
 
 .card button,
@@ -375,7 +375,6 @@ main {
     font-weight: 600;
 }
 
-/* Barra con fondo negro */
 .progress {
     width: 100%;
     height: 20px;
@@ -530,35 +529,12 @@ footer {
 /* COLORES Y POSICIONES */
 /* ================================= */
 
-.pos-gk {
-    background: #1e88e5;
-    color: #ffffff;
-}
-
-.pos-del {
-    background: #e53935;
-    color: #ffffff;
-}
-
-.pos-def {
-    background: #4caf50;
-    color: #000000;
-}
-
-.pos-med {
-    background: #ffb300;
-    color: #000000;
-}
-
-.pos-default {
-    background: linear-gradient(90deg, #00ffff, #ff0055);
-    color: white;
-}
-
-.dark {
-    background: #212121;
-    color: #ffffff;
-}
+.pos-gk { background: #1e88e5; color: #ffffff; }
+.pos-del { background: #e53935; color: #ffffff; }
+.pos-def { background: #4caf50; color: #000000; }
+.pos-med { background: #ffb300; color: #000000; }
+.pos-default { background: linear-gradient(90deg, #00ffff, #ff0055); color: white; }
+.dark { background: #212121; color: #ffffff; }
 
 /* ================================= */
 /* RESPONSIVE */
