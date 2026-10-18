@@ -1,9 +1,17 @@
-{
-  "playlist": [
+"playlist": [
     { "title": "Good Feeling", "file": "./sound 1 dls.mp3" },
+    { "title": "Smooth Criminal", "file": "./dls nº5.mp3" },
     { "title": "Supernatural", "file": "./sound 2 dls.mp3" },
     { "title": "Fale Então", "file": "./sound 3 dls.mp3" },
-    { "title": "7Son", "file": "./sound 4 dls.mp3" }
+    { "title": "Siete Son", "file": "./sound 4 dls.mp3" },
+    { "title": "right here, for now", "file": "./dls nº6.mp3" },
+    { "title": "Beat It", "file": "./dls nº7.mp3" },
+    { "title": "Eye of the Tiger", "file": "./dls nº8.mp3" },
+    { "title": "All I Know", "file": "./dls nº9.mp3" },
+    { "title": "Believer", "file": "./dls nº10.mp3" },
+    { "title": "Beat It", "file": "./dls nº11.mp3" },
+    { "title": "Eye of the Tiger", "file": "./dls nº12.mp3" },
+    { "title": "Carol Of The Bells", "file": "./dls xmas nº13.mp3" }
   ],
   "players": [
     {
