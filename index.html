@@ -35,9 +35,7 @@
         <!-- MINI REPRODUCTOR DE MÚSICA -->
         <div class="music-player">
             <audio id="audioTrack" src="sound 1 dls.mp3"></audio>
-            <div class="music-info">
-                <span id="trackTitle">🎵 Carga tu música</span>
-            </div>
+            <div class="music-info"><span id="trackTitle">🎵 Carga tu música</span></div>
             <div class="music-controls">
                 <select id="trackSelect"></select>
                 <button id="playPauseBtn">▶</button>
@@ -64,6 +62,22 @@
                 <div id="gameTimer" style="font-size: 1.4rem; font-weight: bold; color: #ffcc00;">⏱️ Tiempo: 03:00</div>
                 <button id="pauseBtn" class="btn-pause">⏸️ Pausa (P.DLS)</button>
             </div>
+
+            <!-- BARRA DE TÁCTICAS DLS EN TIEMPO REAL -->
+            <div class="tactics-bar">
+                <div class="tactic-group">
+                    <span><strong>P1 Táctica:</strong></span>
+                    <button id="p1TacticDef" class="tactic-btn">🛡️ Defensa</button>
+                    <button id="p1TacticBal" class="tactic-btn active">⚖️ Equilibrio</button>
+                    <button id="p1TacticAtk" class="tactic-btn">⚔️ Ataque</button>
+                </div>
+                <div class="tactic-group">
+                    <span><strong>P2/CPU Táctica:</strong></span>
+                    <button id="p2TacticDef" class="tactic-btn">🛡️ Defensa</button>
+                    <button id="p2TacticBal" class="tactic-btn active">⚖️ Equilibrio</button>
+                    <button id="p2TacticAtk" class="tactic-btn">⚔️ Ataque</button>
+                </div>
+            </div>
         </div>
 
         <!-- SELECCIÓN DE EQUIPOS DLS -->
@@ -84,13 +98,14 @@
                     <select id="p1BadgeSelect">
                         <option value="RMA.png">Real Madrid</option>
                         <option value="MUN.png">Manchester United</option>
+                        <option value="images.png">FC Barcelona</option>
                         <option value="logo.png">DLS Club</option>
                     </select>
                 </div>
-                <div class="selector-group"><label>🧤 Portero:</label><select id="p1GkSelect"></select></div>
-                <div class="selector-group"><label>🛡️ Defensa:</label><select id="p1DefSelect"></select></div>
+                <div class="selector-group"><label>🧤 Portero (GK):</label><select id="p1GkSelect"></select></div>
+                <div class="selector-group"><label>🛡️ Defensa (DEF):</label><select id="p1DefSelect"></select></div>
                 <div class="selector-group"><label>🎯 Mediocampo (MC):</label><select id="p1MedSelect"></select></div>
-                <div class="selector-group"><label>⚡ Delantero:</label><select id="p1DelSelect"></select></div>
+                <div class="selector-group"><label>⚡ Delantero (DEL):</label><select id="p1DelSelect"></select></div>
             </div>
 
             <!-- SELECCIÓN EQUIPO 2 / CPU -->
@@ -101,6 +116,7 @@
                     <select id="cpuBadgeSelect">
                         <option value="MUN.png">Manchester United</option>
                         <option value="RMA.png">Real Madrid</option>
+                        <option value="images.png">FC Barcelona</option>
                         <option value="logo.png">DLS Club</option>
                     </select>
                 </div>
@@ -112,10 +128,10 @@
                         <option value="difícil">Difícil</option>
                     </select>
                 </div>
-                <div class="selector-group"><label>🧤 Portero:</label><select id="p2GkSelect"></select></div>
-                <div class="selector-group"><label>🛡️ Defensa:</label><select id="p2DefSelect"></select></div>
+                <div class="selector-group"><label>🧤 Portero (GK):</label><select id="p2GkSelect"></select></div>
+                <div class="selector-group"><label>🛡️ Defensa (DEF):</label><select id="p2DefSelect"></select></div>
                 <div class="selector-group"><label>🎯 Mediocampo (MC):</label><select id="p2MedSelect"></select></div>
-                <div class="selector-group"><label>⚡ Delantero:</label><select id="p2DelSelect"></select></div>
+                <div class="selector-group"><label>⚡ Delantero (DEL):</label><select id="p2DelSelect"></select></div>
             </div>
 
             <button id="startGameBtn" class="btn-game">Iniciar Partido ⚽</button>
@@ -131,7 +147,7 @@
         <div class="dls-pause-card">
             <div class="dls-scoreboard-header">
                 <div class="team-score-info">
-                    <span id="p1PauseBadge" class="badge-icon">🛡️</span>
+                    <img id="p1PauseBadgeImg" class="badge-img" src="RMA.png" alt="P1">
                     <span id="p1PauseName">EQUIPO 1</span>
                 </div>
                 <div class="score-display">
@@ -141,7 +157,7 @@
                 </div>
                 <div class="team-score-info">
                     <span id="p2PauseName">EQUIPO 2</span>
-                    <span id="p2PauseBadge" class="badge-icon">🛡️</span>
+                    <img id="p2PauseBadgeImg" class="badge-img" src="MUN.png" alt="P2">
                 </div>
             </div>
             <div class="match-meta-info">DREAM LEAGUE LIVE</div>
@@ -161,22 +177,16 @@
             <div class="subs-container">
                 <div class="sub-group">
                     <h3>Equipo 1 (P1)</h3>
-                    <label>Sustituir Defensa:</label>
-                    <select id="subP1Def"></select>
-                    <label>Sustituir Mediocampo:</label>
-                    <select id="subP1Med"></select>
-                    <label>Sustituir Delantero:</label>
-                    <select id="subP1Del"></select>
+                    <label>Sustituir Defensa:</label><select id="subP1Def"></select>
+                    <label>Sustituir Mediocampo:</label><select id="subP1Med"></select>
+                    <label>Sustituir Delantero:</label><select id="subP1Del"></select>
                     <button id="applySubP1" class="btn-sub">Aplicar Cambios P1</button>
                 </div>
                 <div class="sub-group">
                     <h3>Equipo 2 (P2 / CPU)</h3>
-                    <label>Sustituir Defensa:</label>
-                    <select id="subP2Def"></select>
-                    <label>Sustituir Mediocampo:</label>
-                    <select id="subP2Med"></select>
-                    <label>Sustituir Delantero:</label>
-                    <select id="subP2Del"></select>
+                    <label>Sustituir Defensa:</label><select id="subP2Def"></select>
+                    <label>Sustituir Mediocampo:</label><select id="subP2Med"></select>
+                    <label>Sustituir Delantero:</label><select id="subP2Del"></select>
                     <button id="applySubP2" class="btn-sub">Aplicar Cambios P2</button>
                 </div>
             </div>
@@ -193,15 +203,19 @@
                 <div class="header-team"><span id="stP2Score" class="big-score">0</span> <span id="stP2Name">P2</span></div>
             </div>
             
-            <div class="mvp-section">
-                <h3>⭐ JUGADOR DECISIVO DEL PARTIDO (MVP)</h3>
-                <div id="mvpDisplay" class="mvp-box">
-                    <img id="mvpImg" src="" alt="MVP" onerror="this.src='./download.jpg'">
-                    <div class="mvp-details">
-                        <h4 id="mvpName">Nombre Jugador</h4>
-                        <p id="mvpRole">Rol: Ataque / Defensa</p>
-                        <p id="mvpRating" class="rating-badge">Valoración: 9.5</p>
-                    </div>
+            <h3>⭐ JUGADORES DECISIVOS (MVP POR EQUIPO)</h3>
+            <div class="mvp-container">
+                <div class="mvp-box">
+                    <h4>P1 MVP</h4>
+                    <img id="mvpP1Img" src="" alt="MVP P1" onerror="this.src='./download.jpg'">
+                    <span id="mvpP1Name">Nombre</span>
+                    <span id="mvpP1Role" class="rating-badge">Delantero</span>
+                </div>
+                <div class="mvp-box">
+                    <h4>P2 MVP</h4>
+                    <img id="mvpP2Img" src="" alt="MVP P2" onerror="this.src='./download.jpg'">
+                    <span id="mvpP2Name">Nombre</span>
+                    <span id="mvpP2Role" class="rating-badge">Delantero</span>
                 </div>
             </div>
 
@@ -223,9 +237,7 @@
                 <h2>Base de Datos de Jugadores</h2>
                 <span id="playerCounter">0 Jugadores</span>
             </div>
-
             <div id="playerContainer"></div>
-
             <div class="pagination">
                 <button id="previousBtn" disabled>← Anterior</button>
                 <button id="nextBtn">Siguiente →</button>
