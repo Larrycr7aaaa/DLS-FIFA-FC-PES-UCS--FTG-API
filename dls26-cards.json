@@ -9,13 +9,11 @@
     {
       "id": "arda-guler-2026-dynamic-stars",
       "name": "Arda Güler",
+      "dorsal": 15,
       "image": "./guler.jpg",
       "rating": 96,
       "position": "MCO",
-      "country": {
-        "name": "Turquía",
-        "flag": "🇹🇷"
-      },
+      "country": { "name": "Turquía", "flag": "🇹🇷" },
       "team": "Selección de Turquía",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -29,13 +27,11 @@
     {
       "id": "eberechi-eze-2026-dynamic-stars",
       "name": "Eberechi Eze",
+      "dorsal": 10,
       "image": "./ee.jpg",
       "rating": 96,
       "position": "MCO",
-      "country": {
-        "name": "Inglaterra",
-        "flag": "🇬🇧"
-      },
+      "country": { "name": "Inglaterra", "flag": "🇬🇧" },
       "team": "Selección de Inglaterra",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -49,13 +45,11 @@
     {
       "id": "rodrigo-de-paul-2026-dynamic-stars",
       "name": "Rodrigo De Paul",
+      "dorsal": 7,
       "image": "./rdp.jpg",
       "rating": 96,
       "position": "MC",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Selección de Argentina",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -69,13 +63,11 @@
     {
       "id": "richard-rios-2026-dynamic-stars",
       "name": "Richard Ríos",
+      "dorsal": 6,
       "image": "./rr.jpg",
       "rating": 96,
       "position": "MCD",
-      "country": {
-        "name": "Colombia",
-        "flag": "🇨🇴"
-      },
+      "country": { "name": "Colombia", "flag": "🇨🇴" },
       "team": "Selección de Colombia",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -89,13 +81,11 @@
     {
       "id": "weston-mckennie-2026-dynamic-stars",
       "name": "Weston McKennie",
+      "dorsal": 8,
       "image": "./mc kennie.jpeg",
       "rating": 96,
       "position": "MC",
-      "country": {
-        "name": "EE.UU.",
-        "flag": "🇺🇸"
-      },
+      "country": { "name": "EE.UU.", "flag": "🇺🇸" },
       "team": "Selección de Estados Unidos",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -109,13 +99,11 @@
     {
       "id": "nico-williams-2026-dynamic-stars",
       "name": "Nico Williams",
+      "dorsal": 17,
       "image": "./nw.jpg",
       "rating": 96,
       "position": "EI",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "Selección de España",
       "cardType": "Dynamic Stars",
       "year": 2026,
@@ -129,13 +117,11 @@
     {
       "id": "ousmane-dembele-2025-team-of-2025",
       "name": "Ousmane Dembélé",
+      "dorsal": 10,
       "image": "./dembele.jpg",
       "rating": 97,
       "position": "ED",
-      "country": {
-        "name": "Francia",
-        "flag": "🇫🇷"
-      },
+      "country": { "name": "Francia", "flag": "🇫🇷" },
       "team": "Paris Saint-Germain",
       "cardType": "Team of 2025",
       "year": 2025,
@@ -149,13 +135,11 @@
     {
       "id": "kylian-mbappe-2025-team-of-2025",
       "name": "Kylian Mbappé",
+      "dorsal": 9,
       "image": "./mbappe.jpg",
       "rating": 97,
       "position": "DC",
-      "country": {
-        "name": "Francia",
-        "flag": "🇫🇷"
-      },
+      "country": { "name": "Francia", "flag": "🇫🇷" },
       "team": "Real Madrid",
       "cardType": "Team of 2025",
       "year": 2025,
@@ -169,13 +153,11 @@
     {
       "id": "harry-kane-2025-team-of-2025",
       "name": "Harry Kane",
+      "dorsal": 9,
       "image": "./kane.jpg",
       "rating": 97,
       "position": "DC",
-      "country": {
-        "name": "Inglaterra",
-        "flag": "🇬🇧"
-      },
+      "country": { "name": "Inglaterra", "flag": "🇬🇧" },
       "team": "Bayern Múnich",
       "cardType": "Team of 2025",
       "year": 2025,
@@ -189,13 +171,11 @@
     {
       "id": "pedri-2025-team-of-2025",
       "name": "Pedri",
+      "dorsal": 8,
       "image": "./pedri.jpeg",
       "rating": 96,
       "position": "MC",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "FC Barcelona",
       "cardType": "Team of 2025",
       "year": 2025,
@@ -209,13 +189,11 @@
     {
       "id": "joao-pedro-2026-nuevas-especiales",
       "name": "João Pedro",
+      "dorsal": 20,
       "image": "./j.pedro.jpg",
       "rating": 93,
       "position": "DC",
-      "country": {
-        "name": "Brasil",
-        "flag": "🇧🇷"
-      },
+      "country": { "name": "Brasil", "flag": "🇧🇷" },
       "team": "Chelsea",
       "cardType": "Season Pass",
       "year": 2026,
@@ -229,13 +207,11 @@
     {
       "id": "kevin-de-bruyne-2018-wc-heroes",
       "name": "Kevin De Bruyne",
+      "dorsal": 7,
       "image": "./de bruyne.jpg",
       "rating": 96,
       "position": "MCO",
-      "country": {
-        "name": "Bélgica",
-        "flag": "🇧🇪"
-      },
+      "country": { "name": "Bélgica", "flag": "🇧🇪" },
       "team": "Selección de Bélgica",
       "cardType": "WC Heroes",
       "year": 2018,
@@ -249,13 +225,11 @@
     {
       "id": "luka-modric-2018-champions",
       "name": "Luka Modrić",
+      "dorsal": 10,
       "image": "./modric.jpeg",
       "rating": 96,
       "position": "MC",
-      "country": {
-        "name": "Croacia",
-        "flag": "🇭🇷"
-      },
+      "country": { "name": "Croacia", "flag": "🇭🇷" },
       "team": "Selección de Croacia",
       "cardType": "Champions",
       "year": 2018,
@@ -269,13 +243,11 @@
     {
       "id": "keylor-navas-2014-wc-heroes",
       "name": "Keylor Navas",
+      "dorsal": 1,
       "image": "./k.navas.jpeg",
       "rating": 95,
       "position": "GK",
-      "country": {
-        "name": "Costa Rica",
-        "flag": "🇨🇷"
-      },
+      "country": { "name": "Costa Rica", "flag": "🇨🇷" },
       "team": "Selección de Costa Rica",
       "cardType": "WC Heroes",
       "year": 2014,
@@ -290,13 +262,11 @@
     {
       "id": "angel-di-maria-2014-champions",
       "name": "Ángel Di María",
+      "dorsal": 11,
       "image": "./di maria.jpeg",
       "rating": 95,
       "position": "ED",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Selección de Argentina",
       "cardType": "Champions",
       "year": 2014,
@@ -310,13 +280,11 @@
     {
       "id": "ngolo-kante-2016-champions",
       "name": "N'Golo Kanté",
+      "dorsal": 14,
       "image": "./kante.png",
       "rating": 95,
       "position": "MCD",
-      "country": {
-        "name": "Francia",
-        "flag": "🇫🇷"
-      },
+      "country": { "name": "Francia", "flag": "🇫🇷" },
       "team": "Leicester City",
       "cardType": "Champions",
       "year": 2016,
@@ -330,13 +298,11 @@
     {
       "id": "james-rodriguez-2014-wc-heroes",
       "name": "James Rodríguez",
+      "dorsal": 10,
       "image": "./james.png",
       "rating": 98,
       "position": "MCO",
-      "country": {
-        "name": "Colombia",
-        "flag": "🇨🇴"
-      },
+      "country": { "name": "Colombia", "flag": "🇨🇴" },
       "team": "Selección de Colombia",
       "cardType": "WC Heroes",
       "year": 2014,
@@ -350,13 +316,11 @@
     {
       "id": "fabio-cannavaro-2006-legends",
       "name": "Fabio Cannavaro",
+      "dorsal": 5,
       "image": "./cannavaro.jpg",
       "rating": 98,
       "position": "DFC",
-      "country": {
-        "name": "Italia",
-        "flag": "🇮🇹"
-      },
+      "country": { "name": "Italia", "flag": "🇮🇹" },
       "team": "Selección de Italia",
       "cardType": "Legends",
       "year": 2006,
@@ -370,13 +334,11 @@
     {
       "id": "rivaldo-1999-legends",
       "name": "Rivaldo",
+      "dorsal": 10,
       "image": "./rivaldo.jpg",
       "rating": 98,
       "position": "EI",
-      "country": {
-        "name": "Brasil",
-        "flag": "🇧🇷"
-      },
+      "country": { "name": "Brasil", "flag": "🇧🇷" },
       "team": "FC Barcelona",
       "cardType": "Legends",
       "year": 1999,
@@ -390,13 +352,11 @@
     {
       "id": "carlos-valderrama-1993-legends",
       "name": "Carlos Valderrama",
+      "dorsal": 10,
       "image": "./el pibe.jpg",
       "rating": 96,
       "position": "MCO",
-      "country": {
-        "name": "Colombia",
-        "flag": "🇨🇴"
-      },
+      "country": { "name": "Colombia", "flag": "🇨🇴" },
       "team": "Selección de Colombia",
       "cardType": "Legends",
       "year": 1993,
@@ -410,13 +370,11 @@
     {
       "id": "lionel-messi-2012-champions",
       "name": "Lionel Messi",
+      "dorsal": 10,
       "image": "./messi2012.jpg",
       "rating": 98,
       "position": "ED",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "FC Barcelona",
       "cardType": "Champions",
       "year": 2012,
@@ -430,13 +388,11 @@
     {
       "id": "neymar-jr-2015-champions",
       "name": "Neymar Da Silva Santos Jr",
+      "dorsal": 11,
       "image": "./neymr.jpg",
       "rating": 95,
       "position": "EI",
-      "country": {
-        "name": "Brazil",
-        "flag": "🇧🇷"
-      },
+      "country": { "name": "Brazil", "flag": "🇧🇷" },
       "team": "FC Barcelona",
       "cardType": "Champions",
       "year": 2014,
@@ -450,13 +406,11 @@
     {
       "id": "cristiano-ronaldo-2014-champions",
       "name": "Cristiano Ronaldo",
+      "dorsal": 7,
       "image": "./cr17.jpg",
       "rating": 98,
       "position": "EI",
-      "country": {
-        "name": "Portugal",
-        "flag": "🇵🇹"
-      },
+      "country": { "name": "Portugal", "flag": "🇵🇹" },
       "team": "Real Madrid",
       "cardType": "Champions",
       "year": 2014,
@@ -470,13 +424,11 @@
     {
       "id": "cristiano-ronaldo-2018-wc-heroes",
       "name": "Cristiano Ronaldo",
+      "dorsal": 7,
       "image": "./cr18.jpg",
       "rating": 97,
       "position": "DC",
-      "country": {
-        "name": "Portugal",
-        "flag": "🇵🇹"
-      },
+      "country": { "name": "Portugal", "flag": "🇵🇹" },
       "team": "Selección de Portugal",
       "cardType": "WC Heroes",
       "year": 2018,
@@ -490,13 +442,11 @@
     {
       "id": "tim-payne-2026-hidden",
       "name": "Tim Payne",
+      "dorsal": 2,
       "image": "./payne.jpg",
       "rating": 88,
       "position": "LD",
-      "country": {
-        "name": "Nueva Zelanda",
-        "flag": "🇳🇿"
-      },
+      "country": { "name": "Nueva Zelanda", "flag": "🇳🇿" },
       "team": "Selección de Nueva Zelanda",
       "cardType": "HIDDEN",
       "year": 2026,
@@ -510,13 +460,11 @@
     {
       "id": "luis-suarez-2026-dream-stars",
       "name": "Luis Suárez",
+      "dorsal": 9,
       "image": "./suarez.jpg",
       "rating": 94,
       "position": "DC",
-      "country": {
-        "name": "Colombia",
-        "flag": "🇨🇴"
-      },
+      "country": { "name": "Colombia", "flag": "🇨🇴" },
       "team": "Sporting CP",
       "cardType": "Dream Stars",
       "year": 2026,
@@ -530,13 +478,11 @@
     {
       "id": "kenan-yildiz-2026-dream-stars",
       "name": "Kenan Yildiz",
+      "dorsal": 10,
       "image": "./yildiz.jpg",
       "rating": 95,
       "position": "SD",
-      "country": {
-        "name": "Turquía",
-        "flag": "🇹🇷"
-      },
+      "country": { "name": "Turquía", "flag": "🇹🇷" },
       "team": "Juventus",
       "cardType": "Dream Stars",
       "year": 2026,
@@ -550,13 +496,11 @@
     {
       "id": "patrick-berg-2026-dream-stars",
       "name": "Patrick Berg",
+      "dorsal": 6,
       "image": "./berg.jpeg",
       "rating": 95,
       "position": "MCD",
-      "country": {
-        "name": "Noruega",
-        "flag": "🇳🇴"
-      },
+      "country": { "name": "Noruega", "flag": "🇳🇴" },
       "team": "Bodø/Glimt",
       "cardType": "Dream Stars",
       "year": 2026,
@@ -570,13 +514,11 @@
     {
       "id": "julian-ryerson-2026-dream-stars",
       "name": "Julian Ryerson",
+      "dorsal": 26,
       "image": "./ryerson.jpeg",
       "rating": 95,
       "position": "LD",
-      "country": {
-        "name": "Noruega",
-        "flag": "🇳🇴"
-      },
+      "country": { "name": "Noruega", "flag": "🇳🇴" },
       "team": "Borussia Dortmund",
       "cardType": "Dream Stars",
       "year": 2026,
@@ -590,13 +532,11 @@
     {
       "id": "nicolas-otamendi-2018-cult-heroes",
       "name": "Nicolás Otamendi",
+      "dorsal": 30,
       "image": "./otamendi.jpg",
       "rating": 94,
       "position": "DFC",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Manchester City",
       "cardType": "Cult Heroes",
       "year": 2018,
@@ -610,13 +550,11 @@
     {
       "id": "pierre-emerick-aubameyang-2017-cult-heroes",
       "name": "Pierre-Emerick Aubameyang",
+      "dorsal": 17,
       "image": "./aubameyang.jpg",
       "rating": 95,
       "position": "DC",
-      "country": {
-        "name": "Gabón",
-        "flag": "🇬🇦"
-      },
+      "country": { "name": "Gabón", "flag": "🇬🇦" },
       "team": "Borussia Dortmund",
       "cardType": "Cult Heroes",
       "year": 2017,
@@ -630,13 +568,11 @@
     {
       "id": "isco-2017-cult-heroes",
       "name": "Isco",
+      "dorsal": 22,
       "image": "./isco.jpg",
       "rating": 94,
       "position": "MCO",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "Real Madrid",
       "cardType": "Cult Heroes",
       "year": 2017,
@@ -650,13 +586,11 @@
     {
       "id": "paulo-dybala-2020-cult-heroes",
       "name": "Paulo Dybala",
+      "dorsal": 10,
       "image": "./dybala.jpeg",
       "rating": 95,
       "position": "SD",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Juventus",
       "cardType": "Cult Heroes",
       "year": 2020,
@@ -670,13 +604,11 @@
     {
       "id": "david-luiz-2017-cult-heroes",
       "name": "David Luiz",
+      "dorsal": 30,
       "image": "./dl.jpg",
       "rating": 94,
       "position": "DFC",
-      "country": {
-        "name": "Brasil",
-        "flag": "🇧🇷"
-      },
+      "country": { "name": "Brasil", "flag": "🇧🇷" },
       "team": "Chelsea",
       "cardType": "Cult Heroes",
       "year": 2017,
@@ -690,13 +622,11 @@
     {
       "id": "vozinha-2026-cult-heroes",
       "name": "Vozinha",
+      "dorsal": 1,
       "image": "./vozinha.png",
       "rating": 94,
       "position": "GK",
-      "country": {
-        "name": "Cabo Verde",
-        "flag": "🇨🇻"
-      },
+      "country": { "name": "Cabo Verde", "flag": "🇨🇻" },
       "team": "Colo-Colo",
       "cardType": "Cult Heroes",
       "year": 2026,
@@ -711,13 +641,11 @@
     {
       "id": "lamine-yamal-2026-wc-champions",
       "name": "Lamine Yamal",
+      "dorsal": 19,
       "image": "./yamal.png",
       "rating": 97,
       "position": "ED",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "FC Barcelona",
       "cardType": "WC Champions",
       "year": 2026,
@@ -731,13 +659,11 @@
     {
       "id": "rodri-2026-wc-champions",
       "name": "Rodri",
+      "dorsal": 16,
       "image": "./rodri.png",
       "rating": 97,
       "position": "MCD",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "Manchester City",
       "cardType": "WC Champions",
       "year": 2026,
@@ -751,13 +677,11 @@
     {
       "id": "pau-cubarsi-2026-wc-champions",
       "name": "Pau Cubarsí",
+      "dorsal": 2,
       "image": "./cubarsi.png",
       "rating": 95,
       "position": "DFC",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "FC Barcelona",
       "cardType": "WC Champions",
       "year": 2026,
@@ -771,13 +695,11 @@
     {
       "id": "marc-cucurella-2026-wc-champions",
       "name": "Marc Cucurella",
+      "dorsal": 3,
       "image": "./cucurella.png",
       "rating": 95,
       "position": "LI",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
+      "country": { "name": "España", "flag": "🇪🇸" },
       "team": "Chelsea FC",
       "cardType": "WC Champions",
       "year": 2026,
@@ -791,13 +713,11 @@
     {
       "id": "paul-pogba-2018-wc-champions",
       "name": "Paul Pogba",
+      "dorsal": 6,
       "image": "./pogba.png",
       "rating": 97,
       "position": "MC",
-      "country": {
-        "name": "Francia",
-        "flag": "🇫🇷"
-      },
+      "country": { "name": "Francia", "flag": "🇫🇷" },
       "team": "Manchester United",
       "cardType": "WC Champions",
       "year": 2018,
@@ -811,13 +731,11 @@
     {
       "id": "emiliano-martinez-2022-wc-champions",
       "name": "Emiliano Martínez",
+      "dorsal": 23,
       "image": "./dibu.png",
       "rating": 93,
       "position": "GK",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Aston Villa",
       "cardType": "WC Champions",
       "year": 2022,
@@ -832,13 +750,11 @@
     {
       "id": "enzo-fernandez-2022-wc-champions",
       "name": "Enzo Fernández",
+      "dorsal": 24,
       "image": "./enzo.png",
       "rating": 95,
       "position": "MC",
-      "country": {
-        "name": "Argentina",
-        "flag": "🇦🇷"
-      },
+      "country": { "name": "Argentina", "flag": "🇦🇷" },
       "team": "Benfica",
       "cardType": "WC Champions",
       "year": 2022,
@@ -848,17 +764,36 @@
         "physical": { "speed": 90, "acceleration": 90, "stamina": 100, "strength": 80 },
         "technical": { "control": 100, "passing": 100, "shooting": 90, "tackling": 77 }
       }
-    },
+    },{
+  "id": "unknown-dls-1",
+  "name": "Unk?",
+  "dorsal": "00",
+  "image": "./download.png",
+  "rating": 4,
+  "position": "ALL",
+  "country": {
+    "name": "España",
+    "flag": "🇪🇸"
+  },
+  "team": "Unk?",
+  "cardType": "HIDDEN",
+  "year": 0,
+  "heightCm": 230,
+  "preferredFoot": "left",
+  "stats": {
+    "physical": { "speed": 0, "acceleration": 0, "stamina": 0, "strength": 0 },
+    "technical": { "control": 0, "passing": 0, "shooting": 0, "tackling": 0 },
+    "goalkeeping": { "reflexes": 0, "handling": 0 }
+  }
+},
     {
       "id": "benjamin-pavard-2018-wc-champions",
       "name": "Benjamin Pavard",
+      "dorsal": 2,
       "image": "./pavard.png",
       "rating": 94,
       "position": "LD",
-      "country": {
-        "name": "Francia",
-        "flag": "🇫🇷"
-      },
+      "country": { "name": "Francia", "flag": "🇫🇷" },
       "team": "VfB Stuttgart",
       "cardType": "WC Champions",
       "year": 2018,
@@ -868,27 +803,5 @@
         "physical": { "speed": 100, "acceleration": 100, "stamina": 100, "strength": 90 },
         "technical": { "control": 83, "passing": 83, "shooting": 70, "tackling": 90 }
       }
-    },
-    {
-      "id": "unknown-dls-1",
-      "name": "Unk?",
-      "image": "./download.png",
-      "rating": 4,
-      "position": "ALL",
-      "country": {
-        "name": "España",
-        "flag": "🇪🇸"
-      },
-      "team": "Unk?",
-      "cardType": "HIDDEN",
-      "year": 0,
-      "heightCm": 230,
-      "preferredFoot": "left",
-      "stats": {
-        "physical": { "speed": 0, "acceleration": 0, "stamina": 0, "strength": 0 },
-        "technical": { "control": 0, "passing": 0, "shooting": 0, "tackling": 0 },
-        "goalkeeping": { "reflexes": 0, "handling": 0 }
-      }
     }
   ]
-}
