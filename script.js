@@ -1,12 +1,31 @@
-
 const URL = './dls26-cards.json';
 
+// VARIABLES DE APLICACIÓN Y BASE DE DATOS
 let todosLosJugadores = [];
 let jugadoresFiltrados = [];
 let offset = 0;
 const limite = 8;
 
-// DOM Elements
+// INVENTARIO Y RECURSOS
+let userBalance = {
+    coins: "∞",
+    gems: 225,
+    points: 0,
+    specialAgents: 0,
+    physios: 0,
+    coaches: 0
+};
+
+// RONDAS XI IDEAL
+let currentRound = 1;
+let xiDraftedTeam = { gk: null, defs: [], meds: [], dels: [] };
+const RIVAL_CLUBS = [
+    "Juventus", "Francia", "Real Madrid", "Barça", "Atlético de Madrid", 
+    "Manchester City", "Manchester United", "Athletic Bilbao", "Inter de Milán", 
+    "AC Milan", "Arsenal", "Bayern Múnich", "Dortmund", "Bayer Leverkusen"
+];
+
+// DOM
 const playerContainer = document.getElementById("playerContainer");
 const detailContainer = document.getElementById("detailContainer");
 const previousBtn = document.getElementById("previousBtn");
@@ -14,10 +33,8 @@ const nextBtn = document.getElementById("nextBtn");
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const loading = document.getElementById("loading");
-const errorMessage = document.getElementById("errorMessage");
 const playerCounter = document.getElementById("playerCounter");
 
-// Music Player
 const audioTrack = document.getElementById("audioTrack");
 const playPauseBtn = document.getElementById("playPauseBtn");
 const trackSelect = document.getElementById("trackSelect");
@@ -41,11 +58,8 @@ playPauseBtn.addEventListener("click", () => {
     else { audioTrack.pause(); playPauseBtn.textContent = "▶"; }
 });
 
-function mostrarLoading() { loading.classList.remove("hidden"); }
-function ocultarLoading() { loading.classList.add("hidden"); }
-
 async function cargarDatosAPI() {
-    mostrarLoading();
+    loading.classList.remove("hidden");
     try {
         const respuesta = await fetch(URL);
         const data = await respuesta.json();
@@ -58,11 +72,20 @@ async function cargarDatosAPI() {
         jugadoresFiltrados = [...todosLosJugadores];
         pobladorSelectorJugadores();
         renderizarPaginaActual();
+        actualizarUIInventario();
         inicializarJuegoCanvas();
     } catch (error) {
-        console.error("Error al cargar dls26-cards.json:", error);
+        console.error("Error al cargar la API:", error);
     }
-    ocultarLoading();
+    loading.classList.add("hidden");
+}
+
+function actualizarUIInventario() {
+    document.getElementById("gemsDisplay").textContent = userBalance.gems;
+    document.getElementById("invPoints").textContent = userBalance.points;
+    document.getElementById("invAgents").textContent = userBalance.specialAgents;
+    document.getElementById("invPhysios").textContent = userBalance.physios;
+    document.getElementById("invCoaches").textContent = userBalance.coaches;
 }
 
 function renderizarPaginaActual() {
@@ -83,9 +106,10 @@ function crearCard(player) {
         </div>
         <div class="card-body">
             <h3>${player.name}</h3>
+            <p><strong>Dorsal:</strong> N.º ${player.dorsal || 'N/A'}</p>
             <p><strong>${player.team}</strong> - ${player.position}</p>
             <p><strong>OVR:</strong> ${player.rating}</p>
-            <button class="btn-info">Ver Info</button>
+            <button class="btn-info">Ver Información</button>
         </div>
     `;
     card.querySelector(".btn-info").addEventListener("click", () => mostrarDetalle(player));
@@ -95,6 +119,7 @@ function crearCard(player) {
 function mostrarDetalle(player) {
     detailContainer.innerHTML = `
         <h2>${player.name} ${player.country ? player.country.flag : ''}</h2>
+        <p><strong>Dorsal:</strong> N.º ${player.dorsal || 'N/A'}</p>
         <p><strong>Equipo:</strong> ${player.team}</p>
         <p><strong>Posición:</strong> ${player.position}</p>
         <p><strong>Valoración:</strong> ${player.rating}</p>
@@ -102,8 +127,34 @@ function mostrarDetalle(player) {
     `;
 }
 
+// BÚSQUEDA GENERAL INCLUYENDO "DORSALº" / "DORSAL 10" / "N.º 7"
+function buscarJugador() {
+    let busqueda = searchInput.value.trim().toLowerCase();
+    
+    // Normalizar término dorsal
+    let dorsalMatch = busqueda.match(/dorsal\s*º?\s*(\d+)/i) || busqueda.match(/^º?\s*(\d+)$/);
+    let targetDorsal = dorsalMatch ? parseInt(dorsalMatch[1]) : null;
+
+    jugadoresFiltrados = todosLosJugadores.filter(p => {
+        if (targetDorsal !== null && p.dorsal === targetDorsal) return true;
+        return (
+            p.name?.toLowerCase().includes(busqueda) ||
+            p.team?.toLowerCase().includes(busqueda) ||
+            p.position?.toLowerCase().includes(busqueda) ||
+            String(p.rating).includes(busqueda) ||
+            String(p.dorsal).includes(busqueda)
+        );
+    });
+
+    offset = 0;
+    renderizarPaginaActual();
+}
+
+searchButton.addEventListener("click", buscarJugador);
+searchInput.addEventListener("keyup", buscarJugador);
+
 // ===============================================
-// MOTOR Y LÓGICA DEL MINIJUEGO 4v4 (COLISIONES RÍGIDAS & TÁCTICAS)
+// MOTOR DE JUEGO & MODO XI IDEAL (9 RONDAS)
 // ===============================================
 
 const canvas = document.getElementById("gameCanvas");
@@ -119,18 +170,19 @@ let gameLoopId = null;
 let timerInterval = null;
 let matchTime = 180;
 let isPaused = false;
+let isXIMode = false;
 
 let keys = {};
 let scoreP1 = 0;
 let scoreP2 = 0;
 
-let p1Tactic = 'BAL'; // 'DEF', 'BAL', 'ATK'
+let p1Tactic = 'BAL';
 let p2Tactic = 'BAL';
-
-let statsGame = { p1Shots: 0, p2Shots: 0, p1Passes: 0, p2Passes: 0, p1Time: 0, p2Time: 0 };
 
 let team1 = { gk: null, def: null, med: null, del: null };
 let team2 = { gk: null, def: null, med: null, del: null };
+
+let ball = { x: 425, y: 240, radius: 8, vx: 0, vy: 0, friction: 0.94, holder: null };
 
 function crearEntidad(data, role, number, defaultX, defaultY) {
     return {
@@ -141,14 +193,14 @@ function crearEntidad(data, role, number, defaultX, defaultY) {
         name: data ? data.name : role,
         rating: data ? data.rating : 80,
         image: data ? data.image : '',
-        number: number,
+        number: data ? (data.dorsal || number) : number,
         role: role,
         energy: 100,
-        nitro: 100
+        nitro: 100,
+        // Táctica fija personal del jugador
+        tacticalScheme: role === 'DEF' ? 'STAY_BACK' : role === 'DEL' ? 'PRESS_HIGH' : 'BOX_TO_BOX'
     };
 }
-
-let ball = { x: 425, y: 240, radius: 8, vx: 0, vy: 0, friction: 0.94, holder: null };
 
 function pobladorSelectorJugadores() {
     const p1Gk = document.getElementById("p1GkSelect");
@@ -161,48 +213,23 @@ function pobladorSelectorJugadores() {
     const p2Del = document.getElementById("p2DelSelect");
 
     const selects = [p1Gk, p1Def, p1Med, p1Del, p2Gk, p2Def, p2Med, p2Del];
-    selects.forEach(s => s.innerHTML = "");
+    selects.forEach(s => { if (s) s.innerHTML = ""; });
 
     todosLosJugadores.forEach((p, idx) => {
         const opt = document.createElement("option");
         opt.value = idx;
-        opt.textContent = `${p.country?.flag || ''} ${p.name} (${p.rating} - ${p.position})`;
+        opt.textContent = `${p.country?.flag || ''} ${p.name} (N.º${p.dorsal || '-'}) [${p.position}]`;
         const pos = (p.position || "").toUpperCase();
 
         if (["GK", "POR"].includes(pos)) {
-            p1Gk.appendChild(opt.cloneNode(true));
-            p2Gk.appendChild(opt.cloneNode(true));
+            p1Gk?.appendChild(opt.cloneNode(true)); p2Gk?.appendChild(opt.cloneNode(true));
         } else if (["DFC", "DEF", "LD", "LI"].includes(pos)) {
-            p1Def.appendChild(opt.cloneNode(true));
-            p2Def.appendChild(opt.cloneNode(true));
+            p1Def?.appendChild(opt.cloneNode(true)); p2Def?.appendChild(opt.cloneNode(true));
         } else if (["MC", "MCO", "MCD"].includes(pos)) {
-            p1Med.appendChild(opt.cloneNode(true));
-            p2Med.appendChild(opt.cloneNode(true));
+            p1Med?.appendChild(opt.cloneNode(true)); p2Med?.appendChild(opt.cloneNode(true));
         } else {
-            p1Del.appendChild(opt.cloneNode(true));
-            p2Del.appendChild(opt.cloneNode(true));
+            p1Del?.appendChild(opt.cloneNode(true)); p2Del?.appendChild(opt.cloneNode(true));
         }
-    });
-
-    pobladorSubstituciones();
-}
-
-function pobladorSubstituciones() {
-    const subP1Def = document.getElementById("subP1Def");
-    const subP1Med = document.getElementById("subP1Med");
-    const subP1Del = document.getElementById("subP1Del");
-    const subP2Def = document.getElementById("subP2Def");
-    const subP2Med = document.getElementById("subP2Med");
-    const subP2Del = document.getElementById("subP2Del");
-
-    const subSelects = [subP1Def, subP1Med, subP1Del, subP2Def, subP2Med, subP2Del];
-    subSelects.forEach(s => s.innerHTML = "");
-
-    todosLosJugadores.forEach((p, idx) => {
-        const opt = document.createElement("option");
-        opt.value = idx;
-        opt.textContent = `${p.name} (${p.rating} OVR)`;
-        subSelects.forEach(s => s.appendChild(opt.cloneNode(true)));
     });
 }
 
@@ -210,66 +237,120 @@ function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => { keys[e.key] = true; });
     window.addEventListener("keyup", e => { keys[e.key] = false; });
 
-    document.getElementById("startGameBtn").addEventListener("click", reiniciarPartido);
-    document.getElementById("pauseBtn").addEventListener("click", pausarJuego);
-    document.getElementById("resumeBtn").addEventListener("click", reanudarJuego);
+    document.getElementById("startGameBtn")?.addEventListener("click", () => iniciarPartidoModo('STANDARD'));
+    document.getElementById("btnOpenXI")?.addEventListener("click", abrirModalXIDraft);
+    document.getElementById("btnStartXIDraft")?.addEventListener("click", confirmarEIniciarXIDraft);
 
     setupTacticButtons('p1', (t) => p1Tactic = t);
     setupTacticButtons('p2', (t) => p2Tactic = t);
+}
 
-    document.getElementById("gestionarEquipoBtn").addEventListener("click", () => {
-        document.getElementById("pauseModal").classList.add("hidden");
-        document.getElementById("subModal").classList.remove("hidden");
-    });
+function setupTacticButtons(prefix, cb) {
+    const bDef = document.getElementById(`${prefix}TacticDef`);
+    const bBal = document.getElementById(`${prefix}TacticBal`);
+    const bAtk = document.getElementById(`${prefix}TacticAtk`);
+    
+    if(!bDef) return;
 
-    document.getElementById("closeSubBtn").addEventListener("click", () => {
-        document.getElementById("subModal").classList.add("hidden");
-        document.getElementById("pauseModal").classList.remove("hidden");
-    });
+    const reset = () => { bDef.classList.remove("active"); bBal.classList.remove("active"); bAtk.classList.remove("active"); };
+    bDef.addEventListener("click", () => { reset(); bDef.classList.add("active"); cb('DEF'); });
+    bBal.addEventListener("click", () => { reset(); bBal.classList.add("active"); cb('BAL'); });
+    bAtk.addEventListener("click", () => { reset(); bAtk.classList.add("active"); cb('ATK'); });
+}
 
-    document.getElementById("applySubP1").addEventListener("click", () => {
-        const defP = todosLosJugadores[document.getElementById("subP1Def").value];
-        const medP = todosLosJugadores[document.getElementById("subP1Med").value];
-        const delP = todosLosJugadores[document.getElementById("subP1Del").value];
-        if (defP) team1.def = crearEntidad(defP, 'DEF', 4, team1.def.x, team1.def.y);
-        if (medP) team1.med = crearEntidad(medP, 'MED', 8, team1.med.x, team1.med.y);
-        if (delP) team1.del = crearEntidad(delP, 'DEL', 9, team1.del.x, team1.del.y);
-        alert("¡Sustituciones P1 completadas!");
-    });
+// LÓGICA DE DRAFT MODO XI IDEAL (40 ♦)
+function abrirModalXIDraft() {
+    if (userBalance.gems < 40) {
+        alert("¡No tienes suficientes gemas! Requiere 40♦.");
+        return;
+    }
+    document.getElementById("xiDraftModal").classList.remove("hidden");
+    poblarOpcionesXIDraft();
+}
 
-    document.getElementById("applySubP2").addEventListener("click", () => {
-        const defP = todosLosJugadores[document.getElementById("subP2Def").value];
-        const medP = todosLosJugadores[document.getElementById("subP2Med").value];
-        const delP = todosLosJugadores[document.getElementById("subP2Del").value];
-        if (defP) team2.def = crearEntidad(defP, 'DEF', 3, team2.def.x, team2.def.y);
-        if (medP) team2.med = crearEntidad(medP, 'MED', 6, team2.med.x, team2.med.y);
-        if (delP) team2.del = crearEntidad(delP, 'DEL', 10, team2.del.x, team2.del.y);
-        alert("¡Sustituciones P2 completadas!");
-    });
+function poblarOpcionesXIDraft() {
+    const container = document.getElementById("xiPlayersGrid");
+    container.innerHTML = "";
 
-    document.getElementById("estadisticasBtn").addEventListener("click", mostrarModalStats);
-    document.getElementById("closeStatsBtn").addEventListener("click", () => {
-        document.getElementById("statsModal").classList.add("hidden");
+    const formSelect = document.getElementById("xiFormationSelect").value;
+    // Extraer número defensas, medios, delanteros según formación seleccionada
+    let parts = formSelect.split("-").map(Number);
+    let nDef = parts[0];
+    let nMed = parts[1];
+    let nDel = parts[2] || 1;
+
+    let html = `<div class="xi-selector-box"><label>Portero (GK):</label><select id="xiGkSel"></select></div>`;
+
+    for (let i = 1; i <= nDef; i++) {
+        html += `<div class="xi-selector-box"><label>Defensa ${i}:</label><select id="xiDefSel${i}"></select></div>`;
+    }
+    for (let i = 1; i <= nMed; i++) {
+        html += `<div class="xi-selector-box"><label>Centrocampista ${i}:</label><select id="xiMedSel${i}"></select></div>`;
+    }
+    for (let i = 1; i <= nDel; i++) {
+        html += `<div class="xi-selector-box"><label>Delantero ${i}:</label><select id="xiDelSel${i}"></select></div>`;
+    }
+
+    container.innerHTML = html;
+
+    // Llenar los campos creados con los jugadores disponibles
+    let selects = container.querySelectorAll("select");
+    selects.forEach(sel => {
+        todosLosJugadores.forEach((p, idx) => {
+            let opt = document.createElement("option");
+            opt.value = idx;
+            opt.textContent = `${p.name} (N.º${p.dorsal || '-'}) [${p.position}] - ${p.rating}OVR`;
+            sel.appendChild(opt);
+        });
     });
 }
 
-function setupTacticButtons(playerPrefix, callback) {
-    const btnDef = document.getElementById(`${playerPrefix}TacticDef`);
-    const btnBal = document.getElementById(`${playerPrefix}TacticBal`);
-    const btnAtk = document.getElementById(`${playerPrefix}TacticAtk`);
+document.getElementById("xiFormationSelect")?.addEventListener("change", poblarOpcionesXIDraft);
 
-    const reset = () => {
-        btnDef.classList.remove("active");
-        btnBal.classList.remove("active");
-        btnAtk.classList.remove("active");
-    };
-
-    btnDef.addEventListener("click", () => { reset(); btnDef.classList.add("active"); callback('DEF'); });
-    btnBal.addEventListener("click", () => { reset(); btnBal.classList.add("active"); callback('BAL'); });
-    btnAtk.addEventListener("click", () => { reset(); btnAtk.classList.add("active"); callback('ATK'); });
+function confirmarEIniciarXIDraft() {
+    userBalance.gems -= 40;
+    actualizarUIInventario();
+    document.getElementById("xiDraftModal").classList.add("hidden");
+    
+    currentRound = 1;
+    isXIMode = true;
+    iniciarRondaXI();
 }
 
-function reiniciarPartido() {
+function iniciarRondaXI() {
+    let rivalName = RIVAL_CLUBS[Math.floor(Math.random() * RIVAL_CLUBS.length)];
+    let diff = currentRound <= 3 ? "Fácil" : currentRound <= 6 ? "Normal" : "Difícil";
+    
+    alert(`🏆 MODO XI IDEAL - Ronda ${currentRound}/9 (${diff})\nRival: ${rivalName}`);
+
+    // Configuración de equipos para la partida arcade 4v4 de la ronda
+    let p1Gk = todosLosJugadores[document.getElementById("xiGkSel")?.value || 0];
+    let p1Def = todosLosJugadores[document.getElementById("xiDefSel1")?.value || 1];
+    let p1Med = todosLosJugadores[document.getElementById("xiMedSel1")?.value || 2];
+    let p1Del = todosLosJugadores[document.getElementById("xiDelSel1")?.value || 3];
+
+    team1.gk = crearEntidad(p1Gk, 'GK', p1Gk.dorsal || 1, 50, 240);
+    team1.def = crearEntidad(p1Def, 'DEF', p1Def.dorsal || 4, 180, 240);
+    team1.med = crearEntidad(p1Med, 'MED', p1Med.dorsal || 8, 320, 240);
+    team1.del = crearEntidad(p1Del, 'DEL', p1Del.dorsal || 9, 410, 240);
+
+    // CPU aleatoria para la ronda
+    team2.gk = crearEntidad(todosLosJugadores[13], 'GK', 13, 800, 240);
+    team2.def = crearEntidad(todosLosJugadores[17], 'DEF', 5, 670, 240);
+    team2.med = crearEntidad(todosLosJugadores[2], 'MED', 7, 530, 240);
+    team2.del = crearEntidad(todosLosJugadores[7], 'DEL', 10, 440, 240);
+
+    scoreP1 = 0; scoreP2 = 0;
+    resetPosiciones();
+    iniciarTemporizador();
+
+    if (gameLoopId) cancelAnimationFrame(gameLoopId);
+    isPaused = false;
+    bucleJuego();
+}
+
+function iniciarPartidoModo(type) {
+    isXIMode = false;
     p1BadgeImg.src = document.getElementById("p1BadgeSelect").value;
     p2BadgeImg.src = document.getElementById("cpuBadgeSelect").value;
 
@@ -283,18 +364,17 @@ function reiniciarPartido() {
     const p2Med = todosLosJugadores[document.getElementById("p2MedSelect").value];
     const p2Del = todosLosJugadores[document.getElementById("p2DelSelect").value];
 
-    team1.gk = crearEntidad(p1Gk, 'GK', 1, 50, 240);
-    team1.def = crearEntidad(p1Def, 'DEF', 4, 180, 240);
-    team1.med = crearEntidad(p1Med, 'MED', 8, 320, 240);
-    team1.del = crearEntidad(p1Del, 'DEL', 9, 410, 240);
+    team1.gk = crearEntidad(p1Gk, 'GK', p1Gk?.dorsal || 1, 50, 240);
+    team1.def = crearEntidad(p1Def, 'DEF', p1Def?.dorsal || 4, 180, 240);
+    team1.med = crearEntidad(p1Med, 'MED', p1Med?.dorsal || 8, 320, 240);
+    team1.del = crearEntidad(p1Del, 'DEL', p1Del?.dorsal || 9, 410, 240);
 
-    team2.gk = crearEntidad(p2Gk, 'GK', 13, 800, 240);
-    team2.def = crearEntidad(p2Def, 'DEF', 3, 670, 240);
-    team2.med = crearEntidad(p2Med, 'MED', 6, 530, 240);
-    team2.del = crearEntidad(p2Del, 'DEL', 10, 440, 240);
+    team2.gk = crearEntidad(p2Gk, 'GK', p2Gk?.dorsal || 13, 800, 240);
+    team2.def = crearEntidad(p2Def, 'DEF', p2Def?.dorsal || 3, 670, 240);
+    team2.med = crearEntidad(p2Med, 'MED', p2Med?.dorsal || 6, 530, 240);
+    team2.del = crearEntidad(p2Del, 'DEL', p2Del?.dorsal || 10, 440, 240);
 
     scoreP1 = 0; scoreP2 = 0;
-    statsGame = { p1Shots: 0, p2Shots: 0, p1Passes: 0, p2Passes: 0, p1Time: 0, p2Time: 0 };
     resetPosiciones();
     iniciarTemporizador();
 
@@ -315,24 +395,36 @@ function iniciarTemporizador() {
             if (matchTime <= 0) {
                 clearInterval(timerInterval);
                 cancelAnimationFrame(gameLoopId);
-                mostrarModalStats();
+                finalizarPartido();
             }
         }
     }, 1000);
 }
 
-function pausarJuego() {
-    isPaused = true;
-    document.getElementById("p1PauseScore").textContent = scoreP1;
-    document.getElementById("p2PauseScore").textContent = scoreP2;
-    document.getElementById("p1PauseBadgeImg").src = document.getElementById("p1BadgeSelect").value;
-    document.getElementById("p2PauseBadgeImg").src = document.getElementById("cpuBadgeSelect").value;
-    document.getElementById("pauseModal").classList.remove("hidden");
-}
+function finalizarPartido() {
+    if (isXIMode) {
+        if (scoreP1 > scoreP2) {
+            let winGems = Math.floor(Math.random() * 41) + 40; // 40-80 gemas
+            userBalance.gems += winGems;
+            userBalance.points += 600;
+            userBalance.specialAgents += 1;
+            userBalance.physios += 1;
+            userBalance.coaches += 1;
+            actualizarUIInventario();
 
-function reanudarJuego() {
-    isPaused = false;
-    document.getElementById("pauseModal").classList.add("hidden");
+            if (currentRound < 9) {
+                alert(`🎉 ¡VICTORIA EN RONDA ${currentRound}!\nRecompensas: +${winGems}♦, +600 DP, +1 Agente, +1 Fisio, +1 Entrenador.\nAvanzas a la siguiente ronda.`);
+                currentRound++;
+                iniciarRondaXI();
+            } else {
+                alert("🏆 ¡FELICIDADES! ¡HAS COMPLETADO LAS 9 RONDAS DEL MODO XI IDEAL!");
+            }
+        } else {
+            alert("❌ Has sido eliminado en esta ronda. Vuelve a intentarlo.");
+        }
+    } else {
+        alert(`Fin del partido. Resultado: P1 ${scoreP1} - ${scoreP2} P2`);
+    }
 }
 
 function resetPosiciones() {
@@ -351,81 +443,49 @@ function resetPosiciones() {
 function bucleJuego() {
     if (!isPaused) {
         actualizarJuego();
-        resolverColisionesEntidades(); // IMPEDIR QUE SE ATRAVIESEN
+        resolverColisionesEntidades();
         dibujarJuego();
     }
     gameLoopId = requestAnimationFrame(bucleJuego);
 }
 
 function actualizarJuego() {
-    // PORTEROS
-    if (keys["f"] || keys["F"]) team1.gk.x = Math.min(110, team1.gk.x + 3);
-    if (keys["g"] || keys["G"]) team1.gk.x = Math.max(20, team1.gk.x - 3);
-    if (keys["l"] || keys["L"]) team2.gk.x = Math.max(740, team2.gk.x - 3);
-    if (keys["k"] || keys["K"]) team2.gk.x = Math.min(830, team2.gk.x + 3);
-
-    // DELANTERO P1
+    // MOVIMIENTO P1 DELANTERO
     let speed1 = team1.del.speed * (team1.del.energy / 100);
-    if (keys["q"] || keys["Q"]) {
-        if (team1.del.nitro > 0) { speed1 *= 1.5; team1.del.nitro -= 0.5; }
-    } else { team1.del.nitro = Math.min(100, team1.del.nitro + 0.2); }
-
     if (keys["w"] || keys["W"]) team1.del.y -= speed1;
     if (keys["s"] || keys["S"]) team1.del.y += speed1;
     if (keys["a"] || keys["A"]) team1.del.x -= speed1;
     if (keys["d"] || keys["D"]) team1.del.x += speed1;
 
-    // COMPAÑEROS P1
-    movimientoTácticoAI(team1.def, ball, 1, 'DEF', p1Tactic);
-    movimientoTácticoAI(team1.med, ball, 1, 'MED', p1Tactic);
-
-    // CONTROLES / IA P2
-    const is2P = document.getElementById("gameModeSelect").value === "2P";
-    if (is2P) {
-        let speed2 = team2.del.speed * (team2.del.energy / 100);
-        if (keys["ArrowUp"]) team2.del.y -= speed2;
-        if (keys["ArrowDown"]) team2.del.y += speed2;
-        if (keys["ArrowLeft"]) team2.del.x -= speed2;
-        if (keys["ArrowRight"]) team2.del.x += speed2;
-        movimientoTácticoAI(team2.def, ball, -1, 'DEF', p2Tactic);
-        movimientoTácticoAI(team2.med, ball, -1, 'MED', p2Tactic);
-    } else {
-        movimientoTácticoAI(team2.def, ball, -1, 'DEF', p2Tactic);
-        movimientoTácticoAI(team2.med, ball, -1, 'MED', p2Tactic);
-        movimientoTácticoAI(team2.del, ball, -1, 'DEL', p2Tactic);
-
-        // IA CPU - DISPARO DIRECTO RIVAL (SIN AUTOGOLES)
-        if (ball.holder === team2.del) {
-            if (ball.x < 350) {
-                ball.holder = null;
-                let angle = Math.atan2(240 - team2.del.y, 20 - team2.del.x);
-                ball.vx = Math.cos(angle) * 11;
-                ball.vy = Math.sin(angle) * 11;
-                statsGame.p2Shots++;
-            } else if (Math.random() < 0.015) {
-                ball.holder = null;
-                ball.vx = -8;
-                ball.vy = (Math.random() - 0.5) * 4;
-                statsGame.p2Passes++;
+    // ENTRADA P1 Y QUITAR BALÓN / REDUCIR ENERGÍA EN UN 20%
+    if (keys["x"] || keys["X"]) {
+        const rivales = [team2.def, team2.med, team2.del];
+        rivales.forEach(r => {
+            if (r && Math.hypot(r.x - team1.del.x, r.y - team1.del.y) < 35) {
+                // Quitar balón
+                if (ball.holder === r) ball.holder = team1.del;
+                // Penalizar energía rival en un 20%
+                r.energy = Math.max(0, r.energy - 20);
+                // Impulso físico de desmarque
+                r.x += (r.x - team1.del.x) * 0.5;
             }
-        }
+        });
     }
 
-    // DISPAROS
-    if (keys["e"] || keys["E"]) {
-        if (Math.hypot(ball.x - team1.del.x, ball.y - team1.del.y) < 30) {
-            ball.holder = null;
-            ball.vx = 13; ball.vy = (Math.random() - 0.5) * 4;
-            statsGame.p1Shots++;
-        }
-    }
+    // TÁCTICAS Y RUTA DE JUGADORES
+    movimientoTácticoAI(team1.def, ball, 1, p1Tactic);
+    movimientoTácticoAI(team1.med, ball, 1, p1Tactic);
 
-    if (keys["m"] || keys["M"]) {
-        if (Math.hypot(ball.x - team2.del.x, ball.y - team2.del.y) < 30) {
-            ball.holder = null;
-            ball.vx = -13; ball.vy = (Math.random() - 0.5) * 4;
-            statsGame.p2Shots++;
-        }
+    movimientoTácticoAI(team2.def, ball, -1, p2Tactic);
+    movimientoTácticoAI(team2.med, ball, -1, p2Tactic);
+    movimientoTácticoAI(team2.del, ball, -1, p2Tactic);
+
+    // LÓGICA PREVENCIÓN AUTOGOLES Y DESPEJES IA
+    if (ball.holder === team2.del && ball.x < 350) {
+        ball.holder = null;
+        let angle = Math.atan2(240 - team2.del.y, 20 - team2.del.x);
+        ball.vx = Math.cos(angle) * 11;
+        ball.vy = Math.sin(angle) * 11;
     }
 
     // BALÓN
@@ -435,25 +495,7 @@ function actualizarJuego() {
     } else {
         ball.x += ball.vx; ball.y += ball.vy;
         ball.vx *= ball.friction; ball.vy *= ball.friction;
-        if (ball.y <= 12 || ball.y >= canvas.height - 12) ball.vy *= -1;
     }
-
-    // PREVENCIÓN DE AUTOGOLES Y CONTROL DE POSESIÓN
-    const todos = [team1.gk, team1.def, team1.med, team1.del, team2.gk, team2.def, team2.med, team2.del];
-    todos.forEach(p => {
-        if (p && Math.hypot(ball.x - p.x, ball.y - p.y) < p.radius + ball.radius) {
-            ball.holder = p;
-            if (p === team2.def || p === team2.gk) {
-                ball.holder = null;
-                ball.vx = -9; ball.vy = (Math.random() - 0.5) * 6;
-            } else if (p === team1.def || p === team1.gk) {
-                ball.holder = null;
-                ball.vx = 9; ball.vy = (Math.random() - 0.5) * 6;
-            }
-        }
-    });
-
-    if (ball.x < 425) statsGame.p2Time++; else statsGame.p1Time++;
 
     // GOLES
     if (ball.x <= 10) {
@@ -466,7 +508,6 @@ function actualizarJuego() {
     }
 }
 
-// SISTEMA DE COLISIONES FÍSICAS RÍGIDAS (LOS JUGADORES NO SE ATRAVIESAN)
 function resolverColisionesEntidades() {
     const jug = [team1.gk, team1.def, team1.med, team1.del, team2.gk, team2.def, team2.med, team2.del];
     for (let i = 0; i < jug.length; i++) {
@@ -494,15 +535,15 @@ function resolverColisionesEntidades() {
     }
 }
 
-function movimientoTácticoAI(entidad, balon, dir, role, tactica) {
+function movimientoTácticoAI(entidad, balon, dir, tactica) {
     if (!entidad) return;
 
-    let baseOffX = 0;
-    if (tactica === 'ATK') baseOffX = dir * 100;
-    if (tactica === 'DEF') baseOffX = dir * -80;
+    let offsetTactic = tactica === 'ATK' ? dir * 90 : tactica === 'DEF' ? dir * -70 : 0;
+    let targetX = entidad.baseX + offsetTactic + (balon.x - 425) * 0.25;
+    let targetY = balon.y * 0.5 + entidad.baseY * 0.5;
 
-    let targetX = entidad.baseX + baseOffX + (balon.x - 425) * 0.3;
-    let targetY = balon.y * 0.6 + entidad.baseY * 0.4;
+    // Respetar Esquema Táctico Personalizado por Posición
+    if (entidad.tacticalScheme === 'STAY_BACK') targetX = Math.min(targetX, 250);
 
     entidad.x += (targetX - entidad.x) * 0.04;
     entidad.y += (targetY - entidad.y) * 0.04;
@@ -521,6 +562,7 @@ function dibujarJuego() {
     [team1.gk, team1.def, team1.med, team1.del].forEach(p => dibujarJugador(p, "#00ffff", p1BadgeImg));
     [team2.gk, team2.def, team2.med, team2.del].forEach(p => dibujarJugador(p, "#ff0055", p2BadgeImg));
 
+    // Balón
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#000"; ctx.stroke();
@@ -537,6 +579,7 @@ function dibujarJugador(p, color, badgeImg) {
     ctx.fillStyle = color; ctx.fill();
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
 
+    // DORSAL EXTRAÍDO DEL JSON
     ctx.fillStyle = "#000";
     ctx.font = "bold 12px Poppins";
     ctx.textAlign = "center";
@@ -547,42 +590,9 @@ function dibujarJugador(p, color, badgeImg) {
         ctx.drawImage(badgeImg, p.x - 8, p.y - 32, 16, 16);
     }
 
-    ctx.fillStyle = "#00ff00";
+    // Barra de energía (Refleja pérdidas por entradas)
+    ctx.fillStyle = p.energy > 30 ? "#00ff00" : "#ff0000";
     ctx.fillRect(p.x - 12, p.y + 18, (p.energy / 100) * 24, 3);
 }
-
-function mostrarModalStats() {
-    document.getElementById("stP1Score").textContent = scoreP1;
-    document.getElementById("stP2Score").textContent = scoreP2;
-
-    let totalT = statsGame.p1Time + statsGame.p2Time || 1;
-    let p1P = Math.round((statsGame.p1Time / totalT) * 100);
-    document.getElementById("p1Poss").textContent = `${p1P}%`;
-    document.getElementById("p2Poss").textContent = `${100 - p1P}%`;
-
-    document.getElementById("p1Shots").textContent = statsGame.p1Shots;
-    document.getElementById("p2Shots").textContent = statsGame.p2Shots;
-
-    document.getElementById("mvpP1Name").textContent = team1.del.name;
-    document.getElementById("mvpP1Role").textContent = team1.del.role;
-    document.getElementById("mvpP1Img").src = team1.del.image || './download.jpg';
-
-    document.getElementById("mvpP2Name").textContent = team2.del.name;
-    document.getElementById("mvpP2Role").textContent = team2.del.role;
-    document.getElementById("mvpP2Img").src = team2.del.image || './download.jpg';
-
-    document.getElementById("pauseModal").classList.add("hidden");
-    document.getElementById("statsModal").classList.remove("hidden");
-}
-
-searchButton.addEventListener("click", () => {
-    const val = searchInput.value.toLowerCase();
-    jugadoresFiltrados = todosLosJugadores.filter(p => p.name.toLowerCase().includes(val));
-    offset = 0;
-    renderizarPaginaActual();
-});
-
-nextBtn.addEventListener("click", () => { offset += limite; renderizarPaginaActual(); });
-previousBtn.addEventListener("click", () => { offset -= limite; renderizarPaginaActual(); });
 
 cargarDatosAPI();
