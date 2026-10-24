@@ -1,5 +1,5 @@
 /* ================================= */
-/* RESET */
+/* RESET Y GENERALES */
 /* ================================= */
 
 * {
@@ -152,9 +152,9 @@ header {
 }
 
 .game-header p {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: #ccc;
-    margin-bottom: 5px;
+    margin-bottom: 15px;
 }
 
 .game-controls-bar {
