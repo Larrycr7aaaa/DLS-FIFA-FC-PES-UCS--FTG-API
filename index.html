@@ -60,8 +60,9 @@
             <p><strong>P1 (Cian):</strong> WASD (Mover) | C (Tiro) | Shift (Pegada) | Q (Nitro) | X (Entrada/Defensa) | Z (PowerShot)</p>
             <p><strong>P2 (Rojo):</strong> Flechas (Mover) | L (Tiro) | K (Pegada) | J (Nitro) | M (Entrada/Defensa) | P (PowerShot)</p>
             
-            <div id="gameTimer" style="font-size: 1.5rem; font-weight: bold; color: #ffcc00; margin: 10px 0;">
-                ⏱️ Tiempo: 03:00
+            <div class="timer-pause-container">
+                <div id="gameTimer">⏱️ Tiempo: 03:00</div>
+                <button id="pauseGameBtn" class="btn-pause">⏸️ Pausa</button>
             </div>
         </div>
 
@@ -87,6 +88,10 @@
             <div class="selector-group">
                 <label for="p1BadgeSelect">🛡️ Escudo P1:</label>
                 <select id="p1BadgeSelect">
+                    <option value="images.png">FC Barcelona (images.png)</option>
+                    <option value="BAYERN.png">Bayern Múnich (BAYERN.png)</option>
+                    <option value="PSG.png">PSG (PSG.png)</option>
+                    <option value="bodo glimt.png">Bodø/Glimt (bodo glimt.png)</option>
                     <option value="RMA.png">Real Madrid (RMA.png)</option>
                     <option value="MUN.png">Manchester United (MUN.png)</option>
                     <option value="logo.png">DLS Club (logo.png)</option>
@@ -96,6 +101,10 @@
             <div class="selector-group">
                 <label for="cpuBadgeSelect">🛡️ Escudo P2/CPU:</label>
                 <select id="cpuBadgeSelect">
+                    <option value="BAYERN.png">Bayern Múnich (BAYERN.png)</option>
+                    <option value="images.png">FC Barcelona (images.png)</option>
+                    <option value="PSG.png">PSG (PSG.png)</option>
+                    <option value="bodo glimt.png">Bodø/Glimt (bodo glimt.png)</option>
                     <option value="MUN.png">Manchester United (MUN.png)</option>
                     <option value="RMA.png">Real Madrid (RMA.png)</option>
                     <option value="logo.png">DLS Club (logo.png)</option>
@@ -105,17 +114,79 @@
             <div class="selector-group" id="difficultyGroup">
                 <label for="difficultySelect">⚡ Dificultad CPU:</label>
                 <select id="difficultySelect">
-                    <option value="fácil">Fácil (Solo Defensa)</option>
-                    <option value="normal" selected>Normal (Control, Nitro, Defensa)</option>
-                    <option value="difícil">Difícil (Todas las Skills)</option>
+                    <option value="fácil">Fácil (Ofensiva Básica)</option>
+                    <option value="normal" selected>Normal (Ataque y Presión)</option>
+                    <option value="difícil">Difícil (Ataque Total y Sustituciones)</option>
                 </select>
             </div>
 
             <button id="startGameBtn" class="btn-game">Iniciar Partido ⚽</button>
         </div>
 
-        <div class="canvas-container">
+        <div class="canvas-container" style="position: relative;">
             <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+            <!-- MENÚ DE PAUSA ESTILO P.DLS -->
+            <div id="pauseMenuOverlay" class="game-overlay hidden">
+                <div class="dls-modal">
+                    <h3>PAUSA - DREAM LEAGUE SOCCER</h3>
+                    <p id="halfTimeNotice" class="notice-text hidden">⏸️ Descanso del Partido (30s)</p>
+                    <div class="dls-menu-buttons">
+                        <button id="resumeBtn" class="dls-btn">▶️ REANUDAR</button>
+                        <button id="substitutionsBtn" class="dls-btn">🔄 GESTIONAR EQUIPO / CAMBIOS</button>
+                        <button id="forfeitBtn" class="dls-btn danger">🏳️ RENDIRSE</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL DE SUSTITUCIONES -->
+            <div id="substitutionsModal" class="game-overlay hidden">
+                <div class="dls-modal">
+                    <h3>🔄 REALIZAR SUSTITUCIÓN</h3>
+                    <p id="subReasonText">Selecciona el jugador de reemplazo:</p>
+                    <div class="sub-selectors">
+                        <label for="subTargetSelect">Cambiar jugador de:</label>
+                        <select id="subTargetSelect">
+                            <option value="P1">Jugador 1</option>
+                            <option value="P2">Jugador 2 / CPU</option>
+                        </select>
+                        <label for="replacementSelect">Reemplazante:</label>
+                        <select id="replacementSelect"></select>
+                    </div>
+                    <div class="dls-menu-buttons" style="margin-top:15px;">
+                        <button id="confirmSubBtn" class="dls-btn">✅ CONFIRMAR CAMBIO</button>
+                        <button id="closeSubBtn" class="dls-btn danger">❌ CANCELAR</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL FINAL DE RESUMEN Y MVP ESTILO F.DLS -->
+            <div id="finalSummaryOverlay" class="game-overlay hidden">
+                <div class="dls-modal wide">
+                    <h2>🏆 FINAL DEL PARTIDO - F.DLS</h2>
+                    <h3 id="finalScoreTitle">0 - 0</h3>
+                    
+                    <div class="best-players-grid">
+                        <div class="team-best-card">
+                            <h4>⭐ MEJOR P1</h4>
+                            <p id="p1BestName">-</p>
+                            <p id="p1BestRating">VALORACIÓN: 0.0</p>
+                        </div>
+                        <div class="mvp-card" id="mvpContainer">
+                            <h4>🎖️ JUGADOR DEL PARTIDO (MVP)</h4>
+                            <h3 id="mvpName">Player</h3>
+                            <p id="mvpScore">VALORACIÓN DE RENDIMIENTO: 9.9</p>
+                        </div>
+                        <div class="team-best-card">
+                            <h4>⭐ MEJOR P2 / CPU</h4>
+                            <p id="p2BestName">-</p>
+                            <p id="p2BestRating">VALORACIÓN: 0.0</p>
+                        </div>
+                    </div>
+
+                    <button id="closeSummaryBtn" class="dls-btn" style="margin-top:20px;">CONTINUAR ⚽</button>
+                </div>
+            </div>
         </div>
     </section>
 
