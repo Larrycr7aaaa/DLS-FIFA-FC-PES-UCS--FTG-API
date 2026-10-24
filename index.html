@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DLS 26 Special Cards DataBase & Minijuego Arcade</title>
+    <title>DLS 26 Special Cards DataBase</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,9 +26,9 @@
     <header>
         <div class="logo">
             <div> 
-                <img src="logo.png" alt="Logo DLS" style="height: 50px;" onerror="this.src='./download.jpg';">
+                <img src="logo.png" alt="Logo DLS" style="height: 50px;">
                 <h1>DLS 26 SPA</h1>
-                <p>Colección Oficial de Cartas & Arcade 4v4</p>
+                <p>Colección Oficial de Cartas</p>
             </div>
         </div>
 
@@ -39,7 +39,9 @@
                 <span id="trackTitle">🎵 Carga tu música</span>
             </div>
             <div class="music-controls">
-                <select id="trackSelect"></select>
+                <select id="trackSelect">
+                    <!-- Cargado dinámicamente desde el JSON -->
+                </select>
                 <button id="playPauseBtn">▶</button>
             </div>
         </div>
@@ -54,19 +56,15 @@
     <!-- SECCIÓN DE VIDEOJUEGO -->
     <section class="game-section">
         <div class="game-header">
-            <h2>🎮 Minijuego DLS: Fútbol Arcade 4v4</h2>
-            <div class="controls-guide">
-                <p><strong>P1 (Azul):</strong> WASD (Mover) | Q (Nitro) | E (Tiro) | Z (Control) | X (Defensa) | R (PowerShot) | F/G (Portero Der/Izq)</p>
-                <p><strong>P2 (Rojo):</strong> Flechas (Mover) | P (Nitro) | M (Tiro) | O (Control) | I (Defensa) | N (PowerShot) | L/K (Portero Izq/Der)</p>
-            </div>
+            <h2>🎮 Minijuego DLS: Fútbol Arcade</h2>
+            <p><strong>P1 (Azul):</strong> Flechas (Mover) | Espacio (Tiro) | Shift (Pegada) | Q (Nitro) | X (Defensa) | Z (PowerShot)</p>
+            <p><strong>P2 (Rojo):</strong> WASD (Mover) | F (Tiro) | G (Pegada) | E (Nitro) | R (Defensa) | T (PowerShot)</p>
             
-            <div class="game-status-bar">
-                <div id="gameTimer" style="font-size: 1.4rem; font-weight: bold; color: #ffcc00;">⏱️ Tiempo: 03:00</div>
-                <button id="pauseBtn" class="btn-pause">⏸️ Pausa</button>
+            <div id="gameTimer" style="font-size: 1.5rem; font-weight: bold; color: #ffcc00; margin: 10px 0;">
+                ⏱️ Tiempo: 03:00
             </div>
         </div>
 
-        <!-- SELECCIÓN DE EQUIPOS -->
         <div class="game-controls-bar">
             <div class="selector-group">
                 <label for="gameModeSelect">👥 Modo:</label>
@@ -76,155 +74,63 @@
                 </select>
             </div>
 
-            <!-- SELECCIÓN EQUIPO 1 -->
-            <div class="team-selection-box p1-box">
-                <h3>⚽ Equipo 1 (P1)</h3>
-                <div class="selector-group">
-                    <label>🛡️ Escudo:</label>
-                    <select id="p1BadgeSelect">
-                        <option value="RMA.png">Real Madrid</option>
-                        <option value="MUN.png">Manchester United</option>
-                        <option value="logo.png">DLS Club</option>
-                    </select>
-                </div>
-                <div class="selector-group"><label>🧤 Portero:</label><select id="p1GkSelect"></select></div>
-                <div class="selector-group"><label>🛡️ Defensa:</label><select id="p1DefSelect"></select></div>
-                <div class="selector-group"><label>🎯 Mediocampo:</label><select id="p1MedSelect"></select></div>
-                <div class="selector-group"><label>⚡ Delantero:</label><select id="p1DelSelect"></select></div>
+            <div class="selector-group">
+                <label for="playerSelect">🎮 Jugador 1:</label>
+                <select id="playerSelect"></select>
             </div>
 
-            <!-- SELECCIÓN EQUIPO 2 / CPU -->
-            <div class="team-selection-box p2-box">
-                <h3>⚽ Equipo 2 (P2 / CPU)</h3>
-                <div class="selector-group">
-                    <label>🛡️ Escudo:</label>
-                    <select id="cpuBadgeSelect">
-                        <option value="MUN.png">Manchester United</option>
-                        <option value="RMA.png">Real Madrid</option>
-                        <option value="logo.png">DLS Club</option>
-                    </select>
-                </div>
-                <div class="selector-group" id="difficultyGroup">
-                    <label for="difficultySelect">⚡ Dificultad CPU:</label>
-                    <select id="difficultySelect">
-                        <option value="fácil">Fácil</option>
-                        <option value="normal" selected>Normal</option>
-                        <option value="difícil">Difícil</option>
-                    </select>
-                </div>
-                <div class="selector-group"><label>🧤 Portero:</label><select id="p2GkSelect"></select></div>
-                <div class="selector-group"><label>🛡️ Defensa:</label><select id="p2DefSelect"></select></div>
-                <div class="selector-group"><label>🎯 Mediocampo:</label><select id="p2MedSelect"></select></div>
-                <div class="selector-group"><label>⚡ Delantero:</label><select id="p2DelSelect"></select></div>
+            <div class="selector-group" id="p2PlayerGroup" style="display: none;">
+                <label for="player2Select">🎮 Jugador 2:</label>
+                <select id="player2Select"></select>
+            </div>
+
+            <div class="selector-group">
+                <label for="p1BadgeSelect">🛡️ Escudo P1:</label>
+                <select id="p1BadgeSelect">
+                    <option value="RMA.png">Real Madrid (RMA.png)</option>
+                    <option value="MUN.png">Manchester United (MUN.png)</option>
+                    <option value="logo.png">DLS Club (logo.png)</option>
+                </select>
+            </div>
+
+            <div class="selector-group">
+                <label for="cpuBadgeSelect">🛡️ Escudo P2/CPU:</label>
+                <select id="cpuBadgeSelect">
+                    <option value="MUN.png">Manchester United (MUN.png)</option>
+                    <option value="RMA.png">Real Madrid (RMA.png)</option>
+                    <option value="logo.png">DLS Club (logo.png)</option>
+                </select>
+            </div>
+
+            <div class="selector-group" id="difficultyGroup">
+                <label for="difficultySelect">⚡ Dificultad CPU:</label>
+                <select id="difficultySelect">
+                    <option value="fácil">Fácil (Solo Defensa)</option>
+                    <option value="normal" selected>Normal (Control, Nitro, Defensa)</option>
+                    <option value="difícil">Difícil (Todas las Skills)</option>
+                </select>
             </div>
 
             <button id="startGameBtn" class="btn-game">Iniciar Partido ⚽</button>
         </div>
 
         <div class="canvas-container">
-            <canvas id="gameCanvas" width="850" height="480"></canvas>
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
         </div>
     </section>
 
-    <!-- MODAL DE PAUSA ESTILO P.DLS -->
-    <div id="pauseModal" class="modal-overlay hidden">
-        <div class="dls-pause-card">
-            <div class="dls-scoreboard-header">
-                <div class="team-score-info">
-                    <span id="p1PauseBadge" class="badge-icon">🛡️</span>
-                    <span id="p1PauseName">REAL MADRID</span>
-                </div>
-                <div class="score-display">
-                    <span id="p1PauseScore">0</span>
-                    <span id="pauseTime">90:00</span>
-                    <span id="p2PauseScore">0</span>
-                </div>
-                <div class="team-score-info">
-                    <span id="p2PauseName">FC BARCELONA</span>
-                    <span id="p2PauseBadge" class="badge-icon">🛡️</span>
-                </div>
-            </div>
-            <div class="match-meta-info">DREAM LEAGUE LIVE</div>
-            
-            <div class="dls-menu-buttons">
-                <button id="gestionarEquipoBtn" class="dls-btn blue">⚽ GESTIONAR EQUIPO / CAMBIOS</button>
-                <button id="estadisticasBtn" class="dls-btn blue">📊 ESTADÍSTICAS DEL PARTIDO</button>
-                <button id="resumeBtn" class="dls-btn highlight">▶ REANUDAR</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL SUSTITUCIONES -->
-    <div id="subModal" class="modal-overlay hidden">
-        <div class="dls-modal-card">
-            <h2>🔄 Realizar Sustituciones</h2>
-            <div class="subs-container">
-                <div class="sub-group">
-                    <h3>Equipo 1 (P1)</h3>
-                    <label>Sustituir Defensa:</label>
-                    <select id="subP1Def"></select>
-                    <label>Sustituir Mediocampo:</label>
-                    <select id="subP1Med"></select>
-                    <label>Sustituir Delantero:</label>
-                    <select id="subP1Del"></select>
-                    <button id="applySubP1" class="btn-sub">Aplicar Cambios P1</button>
-                </div>
-                <div class="sub-group">
-                    <h3>Equipo 2 (P2)</h3>
-                    <label>Sustituir Defensa:</label>
-                    <select id="subP2Def"></select>
-                    <label>Sustituir Mediocampo:</label>
-                    <select id="subP2Med"></select>
-                    <label>Sustituir Delantero:</label>
-                    <select id="subP2Del"></select>
-                    <button id="applySubP2" class="btn-sub">Aplicar Cambios P2</button>
-                </div>
-            </div>
-            <button id="closeSubBtn" class="dls-btn gray" style="margin-top:15px;">Cerrar</button>
-        </div>
-    </div>
-
-    <!-- MODAL ESTADÍSTICAS / FIN DE PARTIDO ESTILO F.DLS -->
-    <div id="statsModal" class="modal-overlay hidden">
-        <div class="dls-stats-card">
-            <div class="dls-stats-header">
-                <div class="header-team"><span id="stP1Name">P1</span> <span id="stP1Score" class="big-score">0</span></div>
-                <div class="header-vs">VS</div>
-                <div class="header-team"><span id="stP2Score" class="big-score">0</span> <span id="stP2Name">P2</span></div>
-            </div>
-            
-            <div class="mvp-section">
-                <h3>⭐ JUGADOR DECISIVO DEL PARTIDO (MVP)</h3>
-                <div id="mvpDisplay" class="mvp-box">
-                    <img id="mvpImg" src="" alt="MVP" onerror="this.src='./download.jpg'">
-                    <div class="mvp-details">
-                        <h4 id="mvpName">Nombre Jugador</h4>
-                        <p id="mvpRole">Rol: Ataque / Defensa</p>
-                        <p id="mvpRating" class="rating-badge">Valoración: 9.5</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stats-table">
-                <div class="stat-row"><span id="p1Poss">50%</span><span>POSESIÓN</span><span id="p2Poss">50%</span></div>
-                <div class="stat-row"><span id="p1Shots">0</span><span>TIROS TOTALES</span><span id="p2Shots">0</span></div>
-                <div class="stat-row"><span id="p1Tackles">0</span><span>ENTRADAS / DEFENSA</span><span id="p2Tackles">0</span></div>
-                <div class="stat-row"><span id="p1Passes">0</span><span>PASES COMPLETADOS</span><span id="p2Passes">0</span></div>
-            </div>
-
-            <button id="closeStatsBtn" class="dls-btn highlight" style="margin-top: 20px;">CONTINUAR</button>
-        </div>
-    </div>
-
     <!-- CONTENIDO PRINCIPAL -->
     <main>
+        <!-- SECCIÓN DE JUGADORES -->
         <section class="player-list">
             <div class="section-title">
-                <h2>Base de Datos de Jugadores</h2>
+                <h2>Jugadores</h2>
                 <span id="playerCounter">0 Jugadores</span>
             </div>
 
-            <div id="playerContainer"></div>
+            <div id="playerContainer">
+                <!-- Se genera dinámicamente -->
+            </div>
 
             <div class="pagination">
                 <button id="previousBtn" disabled>← Anterior</button>
@@ -232,17 +138,19 @@
             </div>
         </section>
 
+        <!-- PANEL LATERAL DE DETALLES -->
         <aside class="player-detail">
             <div id="detailContainer">
                 <h2>Selecciona un jugador</h2>
-                <p>Haz clic en "Ver Información" para examinar sus atributos completos.</p>
+                <p>Haz clic en "Ver Información" para examinar los atributos completos.</p>
             </div>
         </aside>
     </main>
 
+    <!-- PIE DE PÁGINA -->
     <footer>
         <p>Proyecto SPA utilizando API DLS 26</p>
-        <p><small>HTML • CSS • JavaScript • Canvas 2D Engine</small></p>
+        <p><small>HTML • CSS • JavaScript • Fetch API</small></p>
     </footer>
 
     <script src="script.js"></script>
