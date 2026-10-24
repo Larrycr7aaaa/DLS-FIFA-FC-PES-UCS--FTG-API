@@ -1,50 +1,28 @@
-// ===========================================
-// DLS 26 CARDS SPA & MINIJUEGO
-// API Local: dls26-cards.json
-// ===========================================
-
 const URL = './dls26-cards.json';
-
-// ==============================
-// VARIABLES DE DATOS Y PAGINACIÓN
-// ==============================
 
 let todosLosJugadores = [];
 let jugadoresFiltrados = [];
 let offset = 0;
 const limite = 8;
 
-// ==============================
-// ELEMENTOS DEL DOM
-// ==============================
-
 const playerContainer = document.getElementById("playerContainer");
 const detailContainer = document.getElementById("detailContainer");
-
 const previousBtn = document.getElementById("previousBtn");
 const nextBtn = document.getElementById("nextBtn");
-
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
-
 const loading = document.getElementById("loading");
 const errorMessage = document.getElementById("errorMessage");
-
 const playerCounter = document.getElementById("playerCounter");
 
-// Mini Reproductor DOM
 const audioTrack = document.getElementById("audioTrack");
 const playPauseBtn = document.getElementById("playPauseBtn");
 const trackSelect = document.getElementById("trackSelect");
 const trackTitle = document.getElementById("trackTitle");
 
-// ==============================
-// LÓGICA DEL REPRODUCTOR
-// ==============================
-
+// REPRODUCTOR
 function inicializarReproductor(playlist) {
     if (!playlist || playlist.length === 0) return;
-
     trackSelect.innerHTML = "";
     playlist.forEach(track => {
         const option = document.createElement("option");
@@ -52,409 +30,187 @@ function inicializarReproductor(playlist) {
         option.textContent = track.title;
         trackSelect.appendChild(option);
     });
-
     audioTrack.src = playlist[0].file;
     trackTitle.textContent = `🎵 ${playlist[0].title}`;
 }
 
 playPauseBtn.addEventListener("click", () => {
-    if (audioTrack.paused) {
-        audioTrack.play();
-        playPauseBtn.textContent = "⏸";
-    } else {
-        audioTrack.pause();
-        playPauseBtn.textContent = "▶";
-    }
+    if (audioTrack.paused) { audioTrack.play(); playPauseBtn.textContent = "⏸"; }
+    else { audioTrack.pause(); playPauseBtn.textContent = "▶"; }
 });
-
-trackSelect.addEventListener("change", (e) => {
-    const selectedFile = e.target.value;
-    const selectedText = e.target.options[e.target.selectedIndex].text;
-
-    audioTrack.src = selectedFile;
-    trackTitle.textContent = `🎵 ${selectedText}`;
-
-    audioTrack.play();
-    playPauseBtn.textContent = "⏸";
-});
-
-// ==============================
-// MAPEO DE COLORES POR POSICIÓN Y ATRIBUTO
-// ==============================
-
-function obtenerClasePosicion(posicion) {
-    if (!posicion) return "pos-default";
-    const pos = posicion.toUpperCase();
-
-    if (["GK", "POR"].includes(pos)) return "pos-gk";
-    if (["DC", "SD", "EI", "ED"].includes(pos)) return "pos-del";
-    if (["DFC", "LD", "LI"].includes(pos)) return "pos-def";
-    if (["MC", "CAI", "CAD", "MCO", "MCD"].includes(pos)) return "pos-med";
-
-    return "pos-default";
-}
-
-function obtenerColorStat(valor) {
-    if (valor === 0) return "#ff66cc";       // Rosa (0)
-    if (valor < 60) return "#ff3333";        // Rojo (1-59)
-    if (valor < 70) return "#ff9900";        // Naranja (60-69)
-    if (valor < 80) return "#ffd700";        // Dorado (70-79)
-    if (valor < 90) return "#2ecc71";        // Verde (80-89)
-    return "#00bfff";                        // Celeste (90-100)
-}
-
-// ==============================
-// ESTADOS (LOADING / ERROR)
-// ==============================
-
-function mostrarLoading() {
-    loading.classList.remove("hidden");
-}
-
-function ocultarLoading() {
-    loading.classList.add("hidden");
-}
-
-function mostrarError(texto = "Error de procesamiento.") {
-    errorMessage.textContent = texto;
-    errorMessage.classList.remove("hidden");
-
-    setTimeout(() => {
-        errorMessage.classList.add("hidden");
-    }, 2500);
-}
-
-// ==============================
-// OBTENER DATOS DE LA API
-// ==============================
 
 async function cargarDatosAPI() {
-    mostrarLoading();
-
+    loading.classList.remove("hidden");
     try {
         const respuesta = await fetch(URL);
-        if (!respuesta.ok) throw new Error("No se pudo cargar la API");
-
         const data = await respuesta.json();
-
-        if (data.playlist) {
-            inicializarReproductor(data.playlist);
-            todosLosJugadores = data.players || [];
-        } else {
-            todosLosJugadores = Array.isArray(data) ? data : [];
-        }
-
+        todosLosJugadores = data.players || data;
         jugadoresFiltrados = [...todosLosJugadores];
+        if (data.playlist) inicializarReproductor(data.playlist);
         
         pobladorSelectorJugadores();
         renderizarPaginaActual();
         inicializarJuegoCanvas();
-    } catch (error) {
-        mostrarError("Error cargando la base de datos.");
-    }
-
-    ocultarLoading();
+    } catch (e) { console.error("Error al cargar la base de datos", e); }
+    loading.classList.add("hidden");
 }
-
-// ==============================
-// RENDERIZAR PÁGINA
-// ==============================
 
 function renderizarPaginaActual() {
     playerContainer.innerHTML = "";
     playerCounter.textContent = `${jugadoresFiltrados.length} Jugadores`;
-
-    if (jugadoresFiltrados.length === 0) {
-        playerContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">No se encontraron resultados.</p>`;
-        return;
-    }
-
     const corte = jugadoresFiltrados.slice(offset, offset + limite);
     corte.forEach(jugador => crearCard(jugador));
-
     previousBtn.disabled = offset === 0;
     nextBtn.disabled = offset + limite >= jugadoresFiltrados.length;
 }
 
-// ==============================
-// TARJETAS
-// ==============================
-
 function crearCard(player) {
     const card = document.createElement("article");
     card.classList.add("card");
-
-    const clasePosicion = obtenerClasePosicion(player.position);
-    const bandera = player.country?.flag ? player.country.flag : '';
-
     card.innerHTML = `
         <div class="card-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" class="player-img" onerror="this.onerror=null; this.src='./download.jpg';">
+            <img src="${player.image}" alt="${player.name}" onerror="this.src='./images_2.png';">
         </div>
         <div class="card-body">
-            <span class="id">#${player.year || ''} • ${bandera}</span>
             <h3>${player.name}</h3>
-            <p><strong>${player.team}</strong></p>
-            <span class="tipo ${clasePosicion}">${player.position}</span>
-            <span class="tipo dark">${player.rating} OVR</span>
-            <button class="btn-info">Ver Información</button>
+            <p><strong>${player.team}</strong> - ${player.position}</p>
+            <p><strong>OVR:</strong> ${player.rating}</p>
+            <button class="btn-info" style="margin-top:8px; width:100%; padding:6px; background:#00ffff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Ver Info</button>
         </div>
     `;
-
-    card.querySelector(".btn-info").addEventListener("click", () => {
-        mostrarDetalle(player);
-    });
-
+    card.querySelector(".btn-info").addEventListener("click", () => mostrarDetalle(player));
     playerContainer.appendChild(card);
 }
 
-// ==============================
-// DETALLE DEL JUGADOR
-// ==============================
-
 function mostrarDetalle(player) {
-    const posUpper = player.position ? player.position.toUpperCase() : "";
-    const esPortero = posUpper === "GK" || posUpper === "POR";
-    const clasePosicion = obtenerClasePosicion(player.position);
-
-    let statsHTML = "";
-
-    if (player.stats) {
-        if (player.stats.physical) {
-            statsHTML += renderBarraStat("Velocidad", player.stats.physical.speed);
-            statsHTML += renderBarraStat("Aceleración", player.stats.physical.acceleration);
-            if (!esPortero) {
-                statsHTML += renderBarraStat("Resistencia", player.stats.physical.stamina);
-            }
-            statsHTML += renderBarraStat("Fuerza", player.stats.physical.strength);
-        }
-
-        if (player.stats.technical) {
-            statsHTML += renderBarraStat("Control", player.stats.technical.control);
-            statsHTML += renderBarraStat("Pases", player.stats.technical.passing);
-            if (!esPortero) {
-                statsHTML += renderBarraStat("Tiro", player.stats.technical.shooting);
-            }
-            statsHTML += renderBarraStat("Entrada", player.stats.technical.tackling);
-        }
-
-        if (esPortero && player.stats.goalkeeping) {
-            statsHTML += renderBarraStat("Reflejos", player.stats.goalkeeping.reflexes);
-            statsHTML += renderBarraStat("Paradas", player.stats.goalkeeping.handling);
-        }
-    }
-
     detailContainer.innerHTML = `
-        <div class="detail-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" class="detail-player-img" onerror="this.src='./download.jpg'">
-        </div>
-        <h2>${player.name} ${player.country ? player.country.flag : ''}</h2>
-        <p><strong>Posición:</strong> <span class="tipo ${clasePosicion}">${player.position}</span> | <strong>Media:</strong> ${player.rating}</p>
+        <h2>${player.name} ${player.country?.flag || ''}</h2>
         <p><strong>Equipo:</strong> ${player.team}</p>
-        <p><strong>País:</strong> ${player.country ? `${player.country.name}${player.country.flag}` : 'N/A'}</p>
-        <p><strong>Tipo de carta:</strong> ${player.cardType || 'Estándar'} (${player.year || ''})</p>
-        <p><strong>Pie preferido:</strong> ${player.preferredFoot || 'N/A'} ${player.heightCm ? `| <strong>Altura:</strong> ${player.heightCm} cm` : ''}</p>
-
-        <div class="stats">
-            <h3>Atributos</h3>
-            ${statsHTML}
-        </div>
+        <p><strong>Posición:</strong> ${player.position}</p>
+        <p><strong>Media:</strong> ${player.rating}</p>
+        <p><strong>Carta:</strong> ${player.cardType} (${player.year})</p>
     `;
 }
-
-function renderBarraStat(label, valor) {
-    if (valor === undefined) return '';
-    const color = obtenerColorStat(valor);
-    return `
-        <div class="stat">
-            <div class="stat-header">
-                <span>${label}</span>
-                <span style="color: ${color};">${valor}</span>
-            </div>
-            <div class="progress">
-                <span style="width: ${Math.min(valor, 100)}%; background-color: ${color};"></span>
-            </div>
-        </div>
-    `;
-}
-
-// ==============================
-// BUSCADOR EN TIEMPO REAL
-// ==============================
 
 function buscarJugador() {
     const busqueda = searchInput.value.trim().toLowerCase();
-
     jugadoresFiltrados = todosLosJugadores.filter(p =>
         p.name?.toLowerCase().includes(busqueda) ||
         p.team?.toLowerCase().includes(busqueda) ||
-        (p.country && p.country.name?.toLowerCase().includes(busqueda)) ||
         p.position?.toLowerCase().includes(busqueda) ||
-        (p.cardType && p.cardType.toLowerCase().includes(busqueda)) ||
-        (p.rating !== undefined && String(p.rating).includes(busqueda))
+        String(p.rating).includes(busqueda)
     );
-
     offset = 0;
     renderizarPaginaActual();
 }
 
-// ===========================================
-// LÓGICA Y MOTOR DEL MINIJUEGO DLS
-// ===========================================
+searchButton.addEventListener("click", buscarJugador);
+searchInput.addEventListener("keyup", buscarJugador);
 
-const gameModeSelect = document.getElementById("gameModeSelect");
-const playerSelect = document.getElementById("playerSelect");
-const player2Select = document.getElementById("player2Select");
-const p2PlayerGroup = document.getElementById("p2PlayerGroup");
-const difficultyGroup = document.getElementById("difficultyGroup");
-const p1BadgeSelect = document.getElementById("p1BadgeSelect");
-const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
-const difficultySelect = document.getElementById("difficultySelect");
-const startGameBtn = document.getElementById("startGameBtn");
-const gameTimerElement = document.getElementById("gameTimer");
+// ===============================================
+// MOTOR DE JUEGO DLS 7v7 CON BALÓN PARADO COMPLETO
+// ===============================================
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let gameLoopId = null;
-let timerInterval = null;
-let matchTime = 180; // 3 minutos
-
+let imgPitch = new Image(); imgPitch.src = './FUT_2.jpg';
+let imgGoal = new Image(); imgGoal.src = './PEN.png';
 let imgP1Badge = new Image();
 let imgCpuBadge = new Image();
 
-let imgPitch = new Image();
-imgPitch.src = './FUT.jpg';
-
+let gameLoopId = null;
+let timerInterval = null;
+let matchTime = 180;
 let keys = {};
 
 let scoreP1 = 0;
 let scoreCpu = 0;
-const POWERSHOT_COOLDOWN = 20000; // 20s
 
-let player1 = {
-    x: 180,
-    y: 225,
-    radius: 20,
-    baseSpeed: 4,
-    speed: 4,
-    name: "Jugador 1",
-    rating: 80,
-    lastDirX: 1,
-    lastDirY: 0,
-    nitro: 100,
-    lastPowerShot: 0
-};
+// ESTADOS DEL PARTIDO
+// NORMAL, FREE_KICK, PENALTY, CORNER, GOAL_KICK, INDIRECT_FREE_KICK
+let matchState = 'NORMAL';
+let takerPlayer = null;
+let restartTimer = 0;
 
-let p2OrCpu = {
-    x: 620,
-    y: 225,
-    radius: 20,
-    baseSpeed: 3.5,
-    speed: 3.5,
-    name: "CPU Bot",
-    rating: 80,
-    lastDirX: -1,
-    lastDirY: 0,
-    nitro: 100,
-    lastPowerShot: 0,
-    reactionRate: 0.05,
-    isHuman: false
-};
+let team1 = [];
+let team2 = [];
 
-let ball = {
-    x: 400,
-    y: 225,
-    radius: 10,
-    vx: 0,
-    vy: 0,
-    friction: 0.94,
-    maxSpeed: 18
-};
+let ball = { x: 450, y: 250, radius: 7, vx: 0, vy: 0, friction: 0.95, holder: null };
+
+function crearJugador(data, role, defaultX, defaultY, teamId) {
+    return {
+        x: defaultX, y: defaultY,
+        baseX: defaultX, baseY: defaultY,
+        radius: 14,
+        speed: data ? 3.2 + (data.rating / 100) * 1.5 : 3.8,
+        name: data ? data.name : role,
+        rating: data ? data.rating : 80,
+        role: role,
+        team: teamId,
+        stamina: 100
+    };
+}
 
 function pobladorSelectorJugadores() {
-    if (!playerSelect) return;
-    playerSelect.innerHTML = "";
-    if (player2Select) player2Select.innerHTML = "";
-    
-    todosLosJugadores.forEach((p, index) => {
-        const option = document.createElement("option");
-        option.value = index;
-        const nacion = p.country?.flag ? p.country.flag : '';
-        option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
-        
-        playerSelect.appendChild(option);
-        if (player2Select) {
-            const opt2 = option.cloneNode(true);
-            player2Select.appendChild(opt2);
-        }
-    });
+    const container = document.getElementById("p1SquadSelectors");
+    if (!container) return;
+    container.innerHTML = "";
 
-    if (player2Select && player2Select.options.length > 1) {
-        player2Select.selectedIndex = 1;
-    }
+    const roles = ["GK", "DEF 1", "DEF 2", "MED 1", "MED 2", "DEL 1", "DEL 2"];
+    roles.forEach((r, idx) => {
+        const div = document.createElement("div");
+        div.innerHTML = `<label style="font-size:0.7rem;">${r}:</label><select id="p1Sel_${idx}"></select>`;
+        container.appendChild(div);
+
+        const sel = div.querySelector("select");
+        todosLosJugadores.forEach((p, i) => {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.textContent = `${p.name} (${p.position})`;
+            if (i === idx) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    });
 }
 
 function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => { keys[e.key] = true; });
     window.addEventListener("keyup", e => { keys[e.key] = false; });
-
-    gameModeSelect.addEventListener("change", () => {
-        if (gameModeSelect.value === "2P") {
-            p2PlayerGroup.style.display = "flex";
-            difficultyGroup.style.display = "none";
-        } else {
-            p2PlayerGroup.style.display = "none";
-            difficultyGroup.style.display = "flex";
-        }
-    });
-
-    startGameBtn.addEventListener("click", reiniciarPartido);
+    document.getElementById("startGameBtn")?.addEventListener("click", reiniciarPartido);
 }
 
 function reiniciarPartido() {
-    // Configurar P1
-    const p1Idx = playerSelect.value;
-    const p1Data = todosLosJugadores[p1Idx] || { name: "Jugador 1", rating: 85 };
-    player1.name = p1Data.name;
-    player1.rating = p1Data.rating;
-    player1.baseSpeed = 3.5 + (player1.rating / 100) * 2.2;
-    player1.nitro = 100;
-    player1.lastPowerShot = 0;
+    imgP1Badge.src = document.getElementById("p1BadgeSelect").value;
+    imgCpuBadge.src = document.getElementById("cpuBadgeSelect").value;
 
-    imgP1Badge.src = p1BadgeSelect.value;
-    imgCpuBadge.src = cpuBadgeSelect.value;
+    const getP1Data = (idx) => todosLosJugadores[document.getElementById(`p1Sel_${idx}`)?.value || idx];
 
-    // Configurar P2 o CPU
-    if (gameModeSelect.value === "2P") {
-        p2OrCpu.isHuman = true;
-        const p2Idx = player2Select.value;
-        const p2Data = todosLosJugadores[p2Idx] || { name: "Jugador 2", rating: 85 };
-        p2OrCpu.name = p2Data.name;
-        p2OrCpu.rating = p2Data.rating;
-        p2OrCpu.baseSpeed = 3.5 + (p2OrCpu.rating / 100) * 2.2;
-    } else {
-        p2OrCpu.isHuman = false;
-        p2OrCpu.name = "CPU Bot";
-        const diff = difficultySelect.value;
-        if (diff === "fácil") {
-            p2OrCpu.baseSpeed = 2.5;
-            p2OrCpu.reactionRate = 0.03;
-        } else if (diff === "normal") {
-            p2OrCpu.baseSpeed = 3.6;
-            p2OrCpu.reactionRate = 0.06;
-        } else { // difícil
-            p2OrCpu.baseSpeed = 4.8;
-            p2OrCpu.reactionRate = 0.1;
-        }
-    }
-    p2OrCpu.nitro = 100;
-    p2OrCpu.lastPowerShot = 0;
+    // ALINEACIÓN 7v7 TEAM 1
+    team1 = [
+        crearJugador(getP1Data(0), 'GK', 60, 250, 1),
+        crearJugador(getP1Data(1), 'DEF', 180, 150, 1),
+        crearJugador(getP1Data(2), 'DEF', 180, 350, 1),
+        crearJugador(getP1Data(3), 'MED', 320, 180, 1),
+        crearJugador(getP1Data(4), 'MED', 320, 320, 1),
+        crearJugador(getP1Data(5), 'DEL', 420, 200, 1),
+        crearJugador(getP1Data(6), 'DEL', 420, 300, 1)
+    ];
 
+    // ALINEACIÓN 7v7 TEAM 2 (CPU / P2)
+    team2 = [
+        crearJugador(todosLosJugadores[13] || null, 'GK', 840, 250, 2),
+        crearJugador(todosLosJugadores[17] || null, 'DEF', 720, 150, 2),
+        crearJugador(todosLosJugadores[29] || null, 'DEF', 720, 350, 2),
+        crearJugador(todosLosJugadores[2] || null, 'MED', 580, 180, 2),
+        crearJugador(todosLosJugadores[3] || null, 'MED', 580, 320, 2),
+        crearJugador(todosLosJugadores[7] || null, 'DEL', 480, 200, 2),
+        crearJugador(todosLosJugadores[8] || null, 'DEL', 480, 300, 2)
+    ];
+
+    scoreP1 = 0; scoreCpu = 0;
+    matchState = 'NORMAL';
     resetPosiciones();
-    scoreP1 = 0;
-    scoreCpu = 0;
-
     iniciarTemporizador();
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
@@ -463,36 +219,32 @@ function reiniciarPartido() {
 
 function iniciarTemporizador() {
     clearInterval(timerInterval);
-    matchTime = 180; // 3 minutos
-
+    matchTime = 180;
     timerInterval = setInterval(() => {
-        matchTime--;
-
-        let m = Math.floor(matchTime / 60);
-        let s = matchTime % 60;
-        let str = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-
-        if (gameTimerElement) gameTimerElement.textContent = str;
-
-        if (matchTime <= 0) {
+        if (matchTime > 0) {
+            matchTime--;
+            let m = Math.floor(matchTime / 60);
+            let s = matchTime % 60;
+            document.getElementById("gameTimer").textContent = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        } else {
             clearInterval(timerInterval);
             cancelAnimationFrame(gameLoopId);
-            alert(`¡FIN DEL PARTIDO!\nResultado: ${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`);
+            alert(`¡Fin del partido! Resultado final: P1 ${scoreP1} - ${scoreCpu} P2`);
         }
     }, 1000);
 }
 
 function resetPosiciones() {
-    player1.x = 180;
-    player1.y = canvas.height / 2;
-    
-    p2OrCpu.x = canvas.width - 180;
-    p2OrCpu.y = canvas.height / 2;
+    ball.x = 450; ball.y = 250; ball.vx = 0; ball.vy = 0; ball.holder = null;
 
-    ball.x = canvas.width / 2;
-    ball.y = canvas.height / 2;
-    ball.vx = 0;
-    ball.vy = 0;
+    // Posiciones iniciales
+    const p1X = [60, 180, 180, 320, 320, 420, 420];
+    const p1Y = [250, 150, 350, 180, 320, 200, 300];
+    team1.forEach((p, i) => { p.x = p1X[i]; p.y = p1Y[i]; });
+
+    const p2X = [840, 720, 720, 580, 580, 480, 480];
+    const p2Y = [250, 150, 350, 180, 320, 200, 300];
+    team2.forEach((p, i) => { p.x = p2X[i]; p.y = p2Y[i]; });
 }
 
 function bucleJuego() {
@@ -502,321 +254,200 @@ function bucleJuego() {
 }
 
 function actualizarJuego() {
-    const now = Date.now();
-
-    // --- CONTROLES Y MOVIMIENTO PLAYER 1 ---
-    let dx1 = 0, dy1 = 0;
-    if (keys["ArrowUp"]) dy1 -= 1;
-    if (keys["ArrowDown"]) dy1 += 1;
-    if (keys["ArrowLeft"]) dx1 -= 1;
-    if (keys["ArrowRight"]) dx1 += 1;
-
-    // Nitro (P1: Q)
-    if (keys["q"] || keys["Q"]) {
-        if (player1.nitro > 0) {
-            player1.speed = player1.baseSpeed * 1.6;
-            player1.nitro = Math.max(0, player1.nitro - 0.8);
-        } else {
-            player1.speed = player1.baseSpeed;
-        }
-    } else {
-        player1.speed = player1.baseSpeed;
-        player1.nitro = Math.min(100, player1.nitro + 0.2); // Recarga progresiva
+    // GESTIÓN DE BALÓN PARADO
+    if (matchState !== 'NORMAL') {
+        actualizarBalonParado();
+        return;
     }
 
-    if (dx1 !== 0 || dy1 !== 0) {
-        let mag = Math.hypot(dx1, dy1);
-        player1.lastDirX = dx1 / mag;
-        player1.lastDirY = dy1 / mag;
-        player1.x += (dx1 / mag) * player1.speed;
-        player1.y += (dy1 / mag) * player1.speed;
-    }
+    // CONTROLES P1 (Delantero principal 5)
+    let p1Capt = team1[5];
+    let spd = p1Capt.speed;
+    if (keys["ArrowUp"]) p1Capt.y -= spd;
+    if (keys["ArrowDown"]) p1Capt.y += spd;
+    if (keys["ArrowLeft"]) p1Capt.x -= spd;
+    if (keys["ArrowRight"]) p1Capt.x += spd;
 
-    player1.x = Math.max(player1.radius, Math.min(canvas.width - player1.radius, player1.x));
-    player1.y = Math.max(player1.radius, Math.min(canvas.height - player1.radius, player1.y));
+    p1Capt.x = Math.max(15, Math.min(885, p1Capt.x));
+    p1Capt.y = Math.max(15, Math.min(485, p1Capt.y));
 
-    // --- CONTROLES Y MOVIMIENTO PLAYER 2 O CPU ---
-    if (p2OrCpu.isHuman) {
-        let dx2 = 0, dy2 = 0;
-        if (keys["w"] || keys["W"]) dy2 -= 1;
-        if (keys["s"] || keys["S"]) dy2 += 1;
-        if (keys["a"] || keys["A"]) dx2 -= 1;
-        if (keys["d"] || keys["D"]) dx2 += 1;
+    // MOVIMIENTO IA COMPAÑEROS P1 Y CPU
+    team1.forEach((p, i) => { if (i !== 5) moverIAPosicional(p, ball); });
+    team2.forEach(p => moverIAPosicional(p, ball));
 
-        // Nitro (P2: E)
-        if (keys["e"] || keys["E"]) {
-            if (p2OrCpu.nitro > 0) {
-                p2OrCpu.speed = p2OrCpu.baseSpeed * 1.6;
-                p2OrCpu.nitro = Math.max(0, p2OrCpu.nitro - 0.8);
-            } else {
-                p2OrCpu.speed = p2OrCpu.baseSpeed;
+    // FÍSICAS DE BALÓN Y POSESIÓN
+    if (ball.holder) {
+        ball.x = ball.holder.x + (ball.holder.team === 1 ? 12 : -12);
+        ball.y = ball.holder.y;
+
+        // TIRO Y PASE P1
+        if (ball.holder === p1Capt) {
+            if (keys[" "]) { // Tiro
+                ball.holder = null;
+                ball.vx = 14; ball.vy = (Math.random() - 0.5) * 4;
+            } else if (keys["Shift"]) { // Pase / Centro
+                ball.holder = null;
+                ball.vx = 9; ball.vy = (Math.random() - 0.5) * 2;
             }
-        } else {
-            p2OrCpu.speed = p2OrCpu.baseSpeed;
-            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
-        }
-
-        if (dx2 !== 0 || dy2 !== 0) {
-            let mag = Math.hypot(dx2, dy2);
-            p2OrCpu.lastDirX = dx2 / mag;
-            p2OrCpu.lastDirY = dy2 / mag;
-            p2OrCpu.x += (dx2 / mag) * p2OrCpu.speed;
-            p2OrCpu.y += (dy2 / mag) * p2OrCpu.speed;
         }
     } else {
-        // Lógica Adaptable de la CPU según dificultad
-        const diff = difficultySelect.value;
-        let targetX = ball.x;
-        let targetY = ball.y;
+        ball.x += ball.vx; ball.y += ball.vy;
+        ball.vx *= ball.friction; ball.vy *= ball.friction;
 
-        if (ball.x < canvas.width / 2) {
-            targetX = canvas.width - 120;
-            targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
-        }
-
-        // Dificultad Normal/Difícil usan Nitro si la pelota está lejos
-        if ((diff === "normal" || diff === "difícil") && Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y) > 150 && p2OrCpu.nitro > 20) {
-            p2OrCpu.speed = p2OrCpu.baseSpeed * 1.5;
-            p2OrCpu.nitro -= 0.5;
-        } else {
-            p2OrCpu.speed = p2OrCpu.baseSpeed;
-            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
-        }
-
-        p2OrCpu.x += (targetX - p2OrCpu.x) * p2OrCpu.reactionRate;
-        p2OrCpu.y += (targetY - p2OrCpu.y) * p2OrCpu.reactionRate;
+        // Capturar posesión
+        [...team1, ...team2].forEach(p => {
+            if (Math.hypot(ball.x - p.x, ball.y - p.y) < p.radius + ball.radius + 2) {
+                ball.holder = p;
+            }
+        });
     }
 
-    p2OrCpu.x = Math.max(p2OrCpu.radius, Math.min(canvas.width - p2OrCpu.radius, p2OrCpu.x));
-    p2OrCpu.y = Math.max(p2OrCpu.radius, Math.min(canvas.height - p2OrCpu.radius, p2OrCpu.y));
+    // REGISTRO DE FALTAS, CÓRNERS, SAQUES DE META Y OUTS
+    comprobarLímitesYFaltas();
+}
 
-    // --- PELOTA PEGADA (CONTROL) ---
-    let distP1Ball = Math.hypot(ball.x - player1.x, ball.y - player1.y);
-    let distP2Ball = Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y);
-    let pelotaPegada = false;
-
-    // P1 Control (Shift)
-    if (keys["Shift"] && distP1Ball < player1.radius + ball.radius + 15) {
-        pelotaPegada = true;
-        ball.x = player1.x + player1.lastDirX * (player1.radius + ball.radius + 2);
-        ball.y = player1.y + player1.lastDirY * (player1.radius + ball.radius + 2);
-        ball.vx = 0; ball.vy = 0;
-    }
-    
-    // P2 Control (G) o CPU Normal/Difícil
-    const cpuCanControl = (!p2OrCpu.isHuman && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
-    if ((keys["g"] || keys["G"] || cpuCanControl) && !pelotaPegada && distP2Ball < p2OrCpu.radius + ball.radius + 15) {
-        pelotaPegada = true;
-        ball.x = p2OrCpu.x + p2OrCpu.lastDirX * (p2OrCpu.radius + ball.radius + 2);
-        ball.y = p2OrCpu.y + p2OrCpu.lastDirY * (p2OrCpu.radius + ball.radius + 2);
-        ball.vx = 0; ball.vy = 0;
+function comprobarLímitesYFaltas() {
+    // FUERA DE BANDA / TIRO LIBRE INDIRECTO
+    if (ball.y <= 10 || ball.y >= 490) {
+        prepararBalonParado('INDIRECT_FREE_KICK', ball.x, ball.y <= 10 ? 20 : 480, 1);
+        return;
     }
 
-    // --- DEFENSA / ENTRADA (P1: X | P2: R | CPU en Todas las Dificultades) ---
-    // P1 Defensa (Quitar pelota a P2)
-    if (keys["x"] || keys["X"]) {
-        if (Math.hypot(p2OrCpu.x - player1.x, p2OrCpu.y - player1.y) < player1.radius + p2OrCpu.radius + 20) {
-            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
-            ball.vx = Math.cos(angle) * 12;
-            ball.vy = Math.sin(angle) * 12;
-        }
-    }
-
-    // P2 o CPU Defensa
-    const cpuDefend = (!p2OrCpu.isHuman); // CPU usa defensa en todas las dificultades
-    if (keys["r"] || keys["R"] || cpuDefend) {
-        if (Math.hypot(player1.x - p2OrCpu.x, player1.y - p2OrCpu.y) < player1.radius + p2OrCpu.radius + 20) {
-            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
-            ball.vx = Math.cos(angle) * 12;
-            ball.vy = Math.sin(angle) * 12;
-        }
-    }
-
-    // --- FÍSICAS DEL BALÓN ---
-    if (!pelotaPegada) {
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-        ball.vx *= ball.friction;
-        ball.vy *= ball.friction;
-
-        let spd = Math.hypot(ball.vx, ball.vy);
-        if (spd > ball.maxSpeed) {
-            ball.vx = (ball.vx / spd) * ball.maxSpeed;
-            ball.vy = (ball.vy / spd) * ball.maxSpeed;
-        }
-
-        // Rebotes
-        if (ball.y - ball.radius <= 0) {
-            ball.y = ball.radius;
-            ball.vy = Math.abs(ball.vy) * 0.85;
-        } else if (ball.y + ball.radius >= canvas.height) {
-            ball.y = canvas.height - ball.radius;
-            ball.vy = -Math.abs(ball.vy) * 0.85;
-        }
-
-        resolverColisionEntidadBalon(player1);
-        resolverColisionEntidadBalon(p2OrCpu);
-    }
-
-    // --- DISPAROS Y POWERSHOT ---
-    // P1 Disparo (Espacio)
-    if (keys[" "] && distP1Ball < player1.radius + ball.radius + 20) {
-        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
-        ball.vx = Math.cos(angle) * 10;
-        ball.vy = Math.sin(angle) * 10;
-    }
-
-    // P2 Disparo (F)
-    if (keys["f"] || keys["F"]) {
-        if (distP2Ball < p2OrCpu.radius + ball.radius + 20) {
-            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
-            ball.vx = Math.cos(angle) * 10;
-            ball.vy = Math.sin(angle) * 10;
-        }
-    }
-
-    // P1 PowerShot (Z)
-    if ((keys["z"] || keys["Z"]) && (now - player1.lastPowerShot >= POWERSHOT_COOLDOWN) && distP1Ball < player1.radius + ball.radius + 25) {
-        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
-        ball.vx = Math.cos(angle) * 17.5;
-        ball.vy = Math.sin(angle) * 17.5;
-        player1.lastPowerShot = now;
-    }
-
-    // P2 PowerShot (T) o CPU Difícil
-    const cpuPowerShot = (!p2OrCpu.isHuman && difficultySelect.value === "difícil" && ball.x > canvas.width * 0.6);
-    if (((keys["t"] || keys["T"]) || cpuPowerShot) && (now - p2OrCpu.lastPowerShot >= POWERSHOT_COOLDOWN) && distP2Ball < p2OrCpu.radius + ball.radius + 25) {
-        let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
-        ball.vx = Math.cos(angle) * 17.5;
-        ball.vy = Math.sin(angle) * 17.5;
-        p2OrCpu.lastPowerShot = now;
-    }
-
-    // --- GOLES ---
-    const goalTop = canvas.height / 2 - 60;
-    const goalBottom = canvas.height / 2 + 60;
-
-    if (ball.x - ball.radius <= 0) {
-        if (ball.y >= goalTop && ball.y <= goalBottom) {
+    // GOLES O BALÓN FUERA EN LÍNEAS DE FONDO
+    if (ball.x <= 15) {
+        if (ball.y > 180 && ball.y < 320) { // Gol P2
             scoreCpu++;
             resetPosiciones();
         } else {
-            ball.x = ball.radius;
-            ball.vx = Math.abs(ball.vx) * 0.85;
+            // Córner o Saque de Meta
+            if (ball.vx < 0) prepararBalonParado('GOAL_KICK', 50, 250, 1);
+            else prepararBalonParado('CORNER', 20, 20, 2);
         }
     }
 
-    if (ball.x + ball.radius >= canvas.width) {
-        if (ball.y >= goalTop && ball.y <= goalBottom) {
+    if (ball.x >= 885) {
+        if (ball.y > 180 && ball.y < 320) { // Gol P1
             scoreP1++;
             resetPosiciones();
         } else {
-            ball.x = canvas.width - ball.radius;
-            ball.vx = -Math.abs(ball.vx) * 0.85;
+            if (ball.vx > 0) prepararBalonParado('GOAL_KICK', 850, 250, 2);
+            else prepararBalonParado('CORNER', 880, 20, 1);
         }
+    }
+
+    // DETECCIÓN DE ENTRADA / TIRO LIBRE O PENALTI
+    if (keys["x"] || keys["X"]) {
+        team2.forEach(p => {
+            if (Math.hypot(p.x - team1[5].x, p.y - team1[5].y) < 22) {
+                if (p.x > 700 && p.y > 120 && p.y < 380) {
+                    prepararBalonParado('PENALTY', 780, 250, 1);
+                } else {
+                    prepararBalonParado('FREE_KICK', p.x, p.y, 1);
+                }
+            }
+        });
     }
 }
 
-function resolverColisionEntidadBalon(entidad) {
-    let dx = ball.x - entidad.x;
-    let dy = ball.y - entidad.y;
-    let distancia = Math.hypot(dx, dy);
-    let minDist = entidad.radius + ball.radius;
+function prepararBalonParado(tipo, x, y, equipoAtacante) {
+    matchState = tipo;
+    ball.x = x; ball.y = y; ball.vx = 0; ball.vy = 0; ball.holder = null;
+    takerPlayer = equipoAtacante === 1 ? team1[5] : team2[5];
+    takerPlayer.x = x - 25; takerPlayer.y = y;
+    restartTimer = 180; // 3 segundos para ejecutar
+}
 
-    if (distancia < minDist) {
-        let angle = Math.atan2(dy, dx);
-        let fuerza = 5;
-        ball.vx = Math.cos(angle) * fuerza;
-        ball.vy = Math.sin(angle) * fuerza;
-        ball.x = entidad.x + Math.cos(angle) * minDist;
-        ball.y = entidad.y + Math.sin(angle) * minDist;
+function actualizarBalonParado() {
+    restartTimer--;
+    if (keys[" "] || keys["Shift"] || restartTimer <= 0) {
+        let pot = keys[" "] ? 15 : 9;
+        let angle = matchState === 'PENALTY' ? 0 : Math.atan2(250 - ball.y, 900 - ball.x);
+
+        ball.vx = Math.cos(angle) * pot;
+        ball.vy = Math.sin(angle) * pot;
+        matchState = 'NORMAL';
     }
+}
+
+function moverIAPosicional(p, b) {
+    let targetX = p.baseX + (b.x - 450) * 0.3;
+    let targetY = p.baseY + (b.y - 250) * 0.3;
+
+    p.x += (targetX - p.x) * 0.04;
+    p.y += (targetY - p.y) * 0.04;
 }
 
 function dibujarJuego() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // CAMPO
     if (imgPitch.complete && imgPitch.naturalWidth > 0) {
         ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
     } else {
-        ctx.fillStyle = "#2e8b57";
+        ctx.fillStyle = "#2b824c";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Dibujar Jugadores
-    dibujarJugadorCanvas(player1, imgP1Badge, "#00ffff");
-    dibujarJugadorCanvas(p2OrCpu, imgCpuBadge, "#ff0055");
+    // PORTERÍAS REALES DLS
+    if (imgGoal.complete && imgGoal.naturalWidth > 0) {
+        ctx.drawImage(imgGoal, -10, 175, 30, 150);
+        ctx.drawImage(imgGoal, canvas.width - 20, 175, 30, 150);
+    }
 
-    // Dibujar Balón
+    // DIBUJAR EQUIPOS 7v7
+    team1.forEach(p => dibujarJugador(p, "#00ffff", imgP1Badge));
+    team2.forEach(p => dibujarJugador(p, "#ff0055", imgCpuBadge));
+
+    // BALÓN
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
 
-    // Marcador
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px Poppins, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`, canvas.width / 2, 35);
+    // INDICADOR BALÓN PARADO Y SCOREBOARD DLS
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 18px Poppins";
+    ctx.fillText(`P1: ${scoreP1}  |  P2: ${scoreCpu}`, canvas.width / 2 - 50, 30);
 
-    // Indicadores de Nitro
-    ctx.fillStyle = "#00ffff";
-    ctx.fillRect(20, 20, player1.nitro * 1.2, 8);
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeRect(20, 20, 120, 8);
+    if (matchState !== 'NORMAL') {
+        ctx.fillStyle = "#ffcc00";
+        ctx.font = "bold 16px Poppins";
+        ctx.fillText(`¡${matchState.replace(/_/g, ' ')}! Presiona ESPACIO o SHIFT`, canvas.width / 2 - 150, 60);
+    }
 
-    ctx.fillStyle = "#ff0055";
-    ctx.fillRect(canvas.width - 140, 20, p2OrCpu.nitro * 1.2, 8);
-    ctx.strokeRect(canvas.width - 140, 20, 120, 8);
+    // RADAR TÁCTICO DLS
+    dibujarRadarDLS();
 }
 
-function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
-    ctx.save();
+function dibujarJugador(p, color, badgeImg) {
     ctx.beginPath();
-    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
-    ctx.clip();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
 
-    if (imgEscudo.complete && imgEscudo.naturalWidth > 0) {
-        ctx.drawImage(imgEscudo, entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
-    } else {
-        ctx.fillStyle = colorBorde;
-        ctx.fillRect(entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
+    if (badgeImg.complete && badgeImg.naturalWidth > 0) {
+        ctx.drawImage(badgeImg, p.x - 8, p.y - 8, 16, 16);
     }
-    ctx.restore();
-
-    ctx.beginPath();
-    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = colorBorde;
-    ctx.lineWidth = 3;
-    ctx.stroke();
 }
 
-// ==============================
-// EVENTOS Y EVENT LISTENERS
-// ==============================
+function dibujarRadarDLS() {
+    let rx = canvas.width / 2 - 60;
+    let ry = canvas.height - 45;
+    let rw = 120, rh = 35;
 
-searchButton.addEventListener("click", buscarJugador);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.strokeRect(rx, ry, rw, rh);
 
-searchInput.addEventListener("keyup", () => {
-    buscarJugador();
-});
+    team1.forEach(p => {
+        ctx.fillStyle = "#00ffff";
+        ctx.fillRect(rx + (p.x / canvas.width) * rw, ry + (p.y / canvas.height) * rh, 3, 3);
+    });
+    team2.forEach(p => {
+        ctx.fillStyle = "#ff0055";
+        ctx.fillRect(rx + (p.x / canvas.width) * rw, ry + (p.y / canvas.height) * rh, 3, 3);
+    });
+}
 
-nextBtn.addEventListener("click", () => {
-    if (offset + limite < jugadoresFiltrados.length) {
-        offset += limite;
-        renderizarPaginaActual();
-    }
-});
-
-previousBtn.addEventListener("click", () => {
-    if (offset - limite >= 0) {
-        offset -= limite;
-        renderizarPaginaActual();
-    }
-});
-
-// INICIALIZAR
 cargarDatosAPI();
