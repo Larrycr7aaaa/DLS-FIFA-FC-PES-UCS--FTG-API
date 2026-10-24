@@ -1,11 +1,9 @@
 {
   "playlist": [
-    { "title": "Track 1 - Good Feeling", "file": "./sound 1 dls.mp3" },
-    { "title": "track 5 - Smooth Criminal", "file": "./dls nº5.mp3" },
-    { "title": "Track 2 - Supernatural", "file": "./sound 2 dls.mp3" },
-    
-    { "title": "Track 3 - Funk DLS", "file": "./sound 3 dls.mp3" },
-    { "title": "Track 4 - Cumbia DLS", "file": "./sound 4 dls.mp3" }
+    { "title": "Good Feeling", "file": "./sound 1 dls.mp3" },
+    { "title": "Supernatural", "file": "./sound 2 dls.mp3" },
+    { "title": "Fale Então", "file": "./sound 3 dls.mp3" },
+    { "title": "7Son", "file": "./sound 4 dls.mp3" }
   ],
   "players": [
     {
@@ -430,6 +428,26 @@
       }
     },
     {
+      "id": "neymar-jr-2015-champions",
+      "name": "Neymar Da Silva Santos Jr",
+      "image": "./neymr.jpg",
+      "rating": 95,
+      "position": "EI",
+      "country": {
+        "name": "Brazil",
+        "flag": "🇧🇷"
+      },
+      "team": "FC Barcelona",
+      "cardType": "Champions",
+      "year": 2014,
+      "heightCm": 178,
+      "preferredFoot": "left",
+      "stats": {
+        "physical": { "speed": 100, "acceleration": 100, "stamina": 100, "strength": 75 },
+        "technical": { "control": 100, "passing": 100, "shooting": 100, "tackling": 54 }
+      }
+    },
+    {
       "id": "cristiano-ronaldo-2014-champions",
       "name": "Cristiano Ronaldo",
       "image": "./cr17.jpg",
@@ -467,6 +485,26 @@
       "stats": {
         "physical": { "speed": 100, "acceleration": 100, "stamina": 100, "strength": 100 },
         "technical": { "control": 100, "passing": 100, "shooting": 100, "tackling": 61 }
+      }
+    },
+    {
+      "id": "tim-payne-2026-hidden",
+      "name": "Tim Payne",
+      "image": "./payne.jpg",
+      "rating": 88,
+      "position": "LD",
+      "country": {
+        "name": "Nueva Zelanda",
+        "flag": "🇳🇿"
+      },
+      "team": "Selección de Nueva Zelanda",
+      "cardType": "HIDDEN",
+      "year": 2026,
+      "heightCm": 179,
+      "preferredFoot": "both",
+      "stats": { 
+        "physical": { "speed": 70, "acceleration": 80, "stamina": 100, "strength": 88 },
+        "technical": { "control": 80, "passing": 90, "shooting": 78, "tackling": 91 }
       }
     },
     {
@@ -713,7 +751,7 @@
     {
       "id": "pau-cubarsi-2026-wc-champions",
       "name": "Pau Cubarsí",
-      "image": "",
+      "image": "./cubarsi.png",
       "rating": 95,
       "position": "DFC",
       "country": {
@@ -833,22 +871,22 @@
     },
     {
       "id": "unknown-dls-1",
-      "name": "?",
-      "image": "./fut.jpg",
+      "name": "Unk?",
+      "image": "./download.png",
       "rating": 4,
       "position": "ALL",
       "country": {
-        "name": "World",
-        "flag": "🌏"
+        "name": "España",
+        "flag": "🇪🇸"
       },
-      "team": "no",
-      "cardType": "base card",
-      "year": 2026,
-      "heightCm": 155,
+      "team": "Unk?",
+      "cardType": "HIDDEN",
+      "year": 0,
+      "heightCm": 230,
       "preferredFoot": "left",
       "stats": {
-        "physical": { "speed": 0, "acceleration": 0, "strength": 0 },
-        "technical": { "control": 0, "passing": 0, "tackling": 0 },
+        "physical": { "speed": 0, "acceleration": 0, "stamina": 0, "strength": 0 },
+        "technical": { "control": 0, "passing": 0, "shooting": 0, "tackling": 0 },
         "goalkeeping": { "reflexes": 0, "handling": 0 }
       }
     }
