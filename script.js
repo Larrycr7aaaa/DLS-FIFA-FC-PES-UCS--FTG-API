@@ -146,10 +146,7 @@ async function cargarDatosAPI() {
         }
 
         jugadoresFiltrados = [...todosLosJugadores];
-        
-        // Carga TODOS los jugadores del JSON al selector del juego
         pobladorSelectorJugadores();
-        
         renderizarPaginaActual();
         inicializarJuegoCanvas();
     } catch (error) {
@@ -317,8 +314,6 @@ const ctx = canvas.getContext("2d");
 let gameLoopId = null;
 let imgP1Badge = new Image();
 let imgCpuBadge = new Image();
-
-// Fondo usando la imagen FUT.jpg
 let imgPitch = new Image();
 imgPitch.src = './FUT.jpg';
 
@@ -355,17 +350,13 @@ let ball = {
     friction: 0.98
 };
 
-// Carga TODOS los personajes que existen en el JSON al menú desplegable
 function pobladorSelectorJugadores() {
     if (!playerSelect) return;
     playerSelect.innerHTML = "";
-    
-    // Recorremos la totalidad de cartas del JSON
     todosLosJugadores.forEach((p, index) => {
         const option = document.createElement("option");
         option.value = index;
-        const nacion = p.country?.flag ? p.country.flag : '';
-        option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
+        option.textContent = `${p.name} (${p.rating} OVR - ${p.position})`;
         playerSelect.appendChild(option);
     });
 }
@@ -387,20 +378,20 @@ function inicializarJuegoCanvas() {
 }
 
 function reiniciarPartido() {
-    // Configurar el jugador que escogió la persona
+    // Configurar Jugador Elegido
     const idx = playerSelect.value;
     const pData = todosLosJugadores[idx] || { name: "Jugador 1", rating: 85 };
     player1.name = pData.name;
     player1.rating = pData.rating;
     
-    // Velocidad proporcional a la media/rating del futbolista elegido
+    // Asignar velocidad basada libremente en la media
     player1.speed = 3.5 + (player1.rating / 100) * 2.5;
 
-    // Escudos
+    // Cargar Escudos Elegidos
     imgP1Badge.src = p1BadgeSelect.value;
     imgCpuBadge.src = cpuBadgeSelect.value;
 
-    // Dificultad Adaptable
+    // Cargar Dificultad Adaptable
     const diff = difficultySelect.value;
     if (diff === "fácil") {
         cpu.speed = 2.5;
@@ -441,42 +432,47 @@ function bucleJuego() {
 }
 
 function actualizarJuego() {
-    // 1. Controles de Flechas
+    // --- 1. Movimiento del Jugador 1 (Flechas) ---
     if (keys["ArrowUp"] && player1.y - player1.radius > 0) player1.y -= player1.speed;
     if (keys["ArrowDown"] && player1.y + player1.radius < canvas.height) player1.y += player1.speed;
     if (keys["ArrowLeft"] && player1.x - player1.radius > 0) player1.x -= player1.speed;
     if (keys["ArrowRight"] && player1.x + player1.radius < canvas.width) player1.x += player1.speed;
 
-    // 2. IA Adaptable CPU
+    // --- 2. IA Adaptable CPU ---
+    // La CPU decide si atacar o defender según la posición de la pelota
     let targetX = ball.x;
     let targetY = ball.y;
 
+    // Si la pelota está en su propia mitad defensiva, defiende la portería (x = 750)
     if (ball.x < canvas.width / 2) {
         targetX = canvas.width - 120;
         targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
     }
 
+    // Movimiento suave hacia el objetivo
     cpu.x += (targetX - cpu.x) * cpu.reactionRate;
     cpu.y += (targetY - cpu.y) * cpu.reactionRate;
 
+    // Limitar bordes para la CPU
     cpu.x = Math.max(cpu.radius, Math.min(canvas.width - cpu.radius, cpu.x));
     cpu.y = Math.max(cpu.radius, Math.min(canvas.height - cpu.radius, cpu.y));
 
-    // 3. Físicas del Balón
+    // --- 3. Movimiento y Físicas del Balón ---
     ball.x += ball.vx;
     ball.y += ball.vy;
     ball.vx *= ball.friction;
     ball.vy *= ball.friction;
 
+    // Colisión de la pelota con pared superior e inferior
     if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
         ball.vy *= -1;
     }
 
-    // 4. Colisiones
+    // --- 4. Colisiones Jugador -> Balón ---
     resolverColisionEntidadBalon(player1);
     resolverColisionEntidadBalon(cpu);
 
-    // Chute con la tecla Espacio
+    // Chute con la tecla Espacio (si el balón está cerca de Player 1)
     if (keys[" "]) {
         let distP1 = Math.hypot(ball.x - player1.x, ball.y - player1.y);
         if (distP1 < player1.radius + ball.radius + 15) {
@@ -486,10 +482,11 @@ function actualizarJuego() {
         }
     }
 
-    // 5. Anotaciones / Goles
+    // --- 5. Porterías y Goles ---
     const goalTop = canvas.height / 2 - 60;
     const goalBottom = canvas.height / 2 + 60;
 
+    // Balón toca la línea izquierda
     if (ball.x - ball.radius <= 0) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreCpu++;
@@ -500,6 +497,7 @@ function actualizarJuego() {
         }
     }
 
+    // Balón toca la línea derecha
     if (ball.x + ball.radius >= canvas.width) {
         if (ball.y >= goalTop && ball.y <= goalBottom) {
             scoreP1++;
@@ -528,7 +526,7 @@ function resolverColisionEntidadBalon(entidad) {
 function dibujarJuego() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Fondo usando la imagen de cancha (FUT.jpg)
+    // 1. Dibujar Cancha (Fondo / Imagen)
     if (imgPitch.complete && imgPitch.naturalWidth > 0) {
         ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
     } else {
@@ -536,13 +534,38 @@ function dibujarJuego() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Dibujar Jugador 1
+    // Líneas del Campo
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 3;
+
+    // Línea central
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
+
+    // Círculo central
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, 50, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Porterías
+    const goalTop = canvas.height / 2 - 60;
+    const goalHeight = 120;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.fillRect(0, goalTop, 15, goalHeight);
+    ctx.fillRect(canvas.width - 15, goalTop, 15, goalHeight);
+
+    ctx.strokeRect(0, goalTop, 15, goalHeight);
+    ctx.strokeRect(canvas.width - 15, goalTop, 15, goalHeight);
+
+    // 2. Dibujar Jugador 1 con su Escudo
     dibujarJugadorCanvas(player1, imgP1Badge, "#00ffff");
 
-    // Dibujar CPU
+    // 3. Dibujar CPU con su Escudo
     dibujarJugadorCanvas(cpu, imgCpuBadge, "#ff0055");
 
-    // Dibujar Balón
+    // 4. Dibujar Balón
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
@@ -551,7 +574,7 @@ function dibujarJuego() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Marcador
+    // 5. Marcador y Nombres
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 22px Poppins, sans-serif";
     ctx.textAlign = "center";
@@ -572,6 +595,7 @@ function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
     }
     ctx.restore();
 
+    // Borde exterior
     ctx.beginPath();
     ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
     ctx.strokeStyle = colorBorde;
