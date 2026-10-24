@@ -1,5 +1,5 @@
 // ===========================================
-// DLS 26 CARDS SPA & MINIJUEGO AVANZADO
+// DLS 26 CARDS SPA & MINIJUEGO FIX GitHub Pages
 // API Local: dls26-cards.json
 // ===========================================
 
@@ -40,24 +40,28 @@ function inicializarReproductor(playlist) {
     trackTitle.textContent = `🎵 ${playlist[0].title}`;
 }
 
-playPauseBtn.addEventListener("click", () => {
-    if (audioTrack.paused) {
+if (playPauseBtn) {
+    playPauseBtn.addEventListener("click", () => {
+        if (audioTrack.paused) {
+            audioTrack.play();
+            playPauseBtn.textContent = "⏸";
+        } else {
+            audioTrack.pause();
+            playPauseBtn.textContent = "▶";
+        }
+    });
+}
+
+if (trackSelect) {
+    trackSelect.addEventListener("change", (e) => {
+        const selectedFile = e.target.value;
+        const selectedText = e.target.options[e.target.selectedIndex].text;
+        audioTrack.src = selectedFile;
+        trackTitle.textContent = `🎵 ${selectedText}`;
         audioTrack.play();
         playPauseBtn.textContent = "⏸";
-    } else {
-        audioTrack.pause();
-        playPauseBtn.textContent = "▶";
-    }
-});
-
-trackSelect.addEventListener("change", (e) => {
-    const selectedFile = e.target.value;
-    const selectedText = e.target.options[e.target.selectedIndex].text;
-    audioTrack.src = selectedFile;
-    trackTitle.textContent = `🎵 ${selectedText}`;
-    audioTrack.play();
-    playPauseBtn.textContent = "⏸";
-});
+    });
+}
 
 function obtenerClasePosicion(posicion) {
     if (!posicion) return "pos-default";
@@ -78,12 +82,14 @@ function obtenerColorStat(valor) {
     return "#00bfff";
 }
 
-function mostrarLoading() { loading.classList.remove("hidden"); }
-function ocultarLoading() { loading.classList.add("hidden"); }
+function mostrarLoading() { if (loading) loading.classList.remove("hidden"); }
+function ocultarLoading() { if (loading) loading.classList.add("hidden"); }
 function mostrarError(texto = "Error de procesamiento.") {
-    errorMessage.textContent = texto;
-    errorMessage.classList.remove("hidden");
-    setTimeout(() => { errorMessage.classList.add("hidden"); }, 2500);
+    if (errorMessage) {
+        errorMessage.textContent = texto;
+        errorMessage.classList.remove("hidden");
+        setTimeout(() => { errorMessage.classList.add("hidden"); }, 2500);
+    }
 }
 
 async function cargarDatosAPI() {
@@ -111,8 +117,9 @@ async function cargarDatosAPI() {
 }
 
 function renderizarPaginaActual() {
+    if (!playerContainer) return;
     playerContainer.innerHTML = "";
-    playerCounter.textContent = `${jugadoresFiltrados.length} Jugadores`;
+    if (playerCounter) playerCounter.textContent = `${jugadoresFiltrados.length} Jugadores`;
 
     if (jugadoresFiltrados.length === 0) {
         playerContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">No se encontraron resultados.</p>`;
@@ -122,8 +129,8 @@ function renderizarPaginaActual() {
     const corte = jugadoresFiltrados.slice(offset, offset + limite);
     corte.forEach(jugador => crearCard(jugador));
 
-    previousBtn.disabled = offset === 0;
-    nextBtn.disabled = offset + limite >= jugadoresFiltrados.length;
+    if (previousBtn) previousBtn.disabled = offset === 0;
+    if (nextBtn) nextBtn.disabled = offset + limite >= jugadoresFiltrados.length;
 }
 
 function crearCard(player) {
@@ -151,6 +158,7 @@ function crearCard(player) {
 }
 
 function mostrarDetalle(player) {
+    if (!detailContainer) return;
     const posUpper = player.position ? player.position.toUpperCase() : "";
     const esPortero = posUpper === "GK" || posUpper === "POR";
     const clasePosicion = obtenerClasePosicion(player.position);
@@ -209,6 +217,7 @@ function renderBarraStat(label, valor) {
 }
 
 function buscarJugador() {
+    if (!searchInput) return;
     const busqueda = searchInput.value.trim().toLowerCase();
     jugadoresFiltrados = todosLosJugadores.filter(p =>
         p.name?.toLowerCase().includes(busqueda) ||
@@ -253,14 +262,16 @@ const finalSummaryOverlay = document.getElementById("finalSummaryOverlay");
 const closeSummaryBtn = document.getElementById("closeSummaryBtn");
 
 const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 
 let gameLoopId = null;
 let timerInterval = null;
-let matchTime = 180; // 3 minutos
+let matchTime = 180;
 let isPaused = false;
 let isHalfTimePaused = false;
 let halfTimeTimer = null;
+let hasPromptedSubP1 = false;
+let hasPromptedSubP2 = false;
 
 let imgP1Badge = new Image();
 let imgCpuBadge = new Image();
@@ -272,7 +283,6 @@ let scoreP1 = 0;
 let scoreCpu = 0;
 const POWERSHOT_COOLDOWN = 20000;
 
-// Objetos del Partido: Equipos con Jugador, Defensa y Portero
 let team1 = {
     main: { x: 180, y: 225, radius: 20, baseSpeed: 4, speed: 4, name: "Jugador 1", rating: 85, lastDirX: 1, lastDirY: 0, nitro: 100, hp: 100, stunnedUntil: 0, lastPowerShot: 0, goals: 0 },
     defender: { x: 110, y: 225, radius: 18, speed: 3.2, name: "Defensa P1" },
@@ -321,36 +331,47 @@ function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => { keys[e.key] = true; });
     window.addEventListener("keyup", e => { keys[e.key] = false; });
 
-    gameModeSelect.addEventListener("change", () => {
-        if (gameModeSelect.value === "2P") {
-            p2PlayerGroup.style.display = "flex";
-            difficultyGroup.style.display = "none";
-        } else {
-            p2PlayerGroup.style.display = "none";
-            difficultyGroup.style.display = "flex";
-        }
-    });
+    if (gameModeSelect) {
+        gameModeSelect.addEventListener("change", () => {
+            if (gameModeSelect.value === "2P") {
+                if (p2PlayerGroup) p2PlayerGroup.style.display = "flex";
+                if (difficultyGroup) difficultyGroup.style.display = "none";
+            } else {
+                if (p2PlayerGroup) p2PlayerGroup.style.display = "none";
+                if (difficultyGroup) difficultyGroup.style.display = "flex";
+            }
+        });
+    }
 
-    startGameBtn.addEventListener("click", reiniciarPartido);
-    pauseGameBtn.addEventListener("click", abrirPausa);
-    resumeBtn.addEventListener("click", cerrarPausa);
-    forfeitBtn.addEventListener("click", rendirsePartido);
-    substitutionsBtn.addEventListener("click", () => {
-        pauseMenuOverlay.classList.add("hidden");
-        substitutionsModal.classList.remove("hidden");
-    });
-    closeSubBtn.addEventListener("click", () => {
-        substitutionsModal.classList.add("hidden");
-        if (isPaused) pauseMenuOverlay.classList.remove("hidden");
-    });
-    confirmSubBtn.addEventListener("click", ejecutarSustitucion);
-    closeSummaryBtn.addEventListener("click", () => {
-        finalSummaryOverlay.classList.add("hidden");
-    });
+    if (startGameBtn) startGameBtn.addEventListener("click", reiniciarPartido);
+    if (pauseGameBtn) pauseGameBtn.addEventListener("click", abrirPausa);
+    if (resumeBtn) resumeBtn.addEventListener("click", cerrarPausa);
+    if (forfeitBtn) forfeitBtn.addEventListener("click", rendirsePartido);
+    
+    if (substitutionsBtn) {
+        substitutionsBtn.addEventListener("click", () => {
+            if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
+            if (substitutionsModal) substitutionsModal.classList.remove("hidden");
+        });
+    }
+    
+    if (closeSubBtn) {
+        closeSubBtn.addEventListener("click", () => {
+            if (substitutionsModal) substitutionsModal.classList.add("hidden");
+            if (isPaused && pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
+        });
+    }
+
+    if (confirmSubBtn) confirmSubBtn.addEventListener("click", ejecutarSustitucion);
+    if (closeSummaryBtn) {
+        closeSummaryBtn.addEventListener("click", () => {
+            if (finalSummaryOverlay) finalSummaryOverlay.classList.add("hidden");
+        });
+    }
 }
 
 function reiniciarPartido() {
-    const p1Idx = playerSelect.value;
+    const p1Idx = playerSelect ? playerSelect.value : 0;
     const p1Data = todosLosJugadores[p1Idx] || { name: "Jugador 1", rating: 85 };
     team1.main.name = p1Data.name;
     team1.main.rating = p1Data.rating;
@@ -361,12 +382,12 @@ function reiniciarPartido() {
     team1.main.lastPowerShot = 0;
     team1.main.goals = 0;
 
-    imgP1Badge.src = p1BadgeSelect.value;
-    imgCpuBadge.src = cpuBadgeSelect.value;
+    if (p1BadgeSelect) imgP1Badge.src = encodeURI(p1BadgeSelect.value);
+    if (cpuBadgeSelect) imgCpuBadge.src = encodeURI(cpuBadgeSelect.value);
 
-    if (gameModeSelect.value === "2P") {
+    if (gameModeSelect && gameModeSelect.value === "2P") {
         team2.main.isHuman = true;
-        const p2Idx = player2Select.value;
+        const p2Idx = player2Select ? player2Select.value : 1;
         const p2Data = todosLosJugadores[p2Idx] || { name: "Jugador 2", rating: 85 };
         team2.main.name = p2Data.name;
         team2.main.rating = p2Data.rating;
@@ -374,7 +395,7 @@ function reiniciarPartido() {
     } else {
         team2.main.isHuman = false;
         team2.main.name = "CPU Bot";
-        const diff = difficultySelect.value;
+        const diff = difficultySelect ? difficultySelect.value : "normal";
         if (diff === "fácil") {
             team2.main.baseSpeed = 2.8;
             team2.main.reactionRate = 0.04;
@@ -397,10 +418,12 @@ function reiniciarPartido() {
     scoreCpu = 0;
     isPaused = false;
     isHalfTimePaused = false;
+    hasPromptedSubP1 = false;
+    hasPromptedSubP2 = false;
     
-    pauseMenuOverlay.classList.add("hidden");
-    substitutionsModal.classList.add("hidden");
-    finalSummaryOverlay.classList.add("hidden");
+    if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
+    if (substitutionsModal) substitutionsModal.classList.add("hidden");
+    if (finalSummaryOverlay) finalSummaryOverlay.classList.add("hidden");
 
     iniciarTemporizador();
 
@@ -423,7 +446,6 @@ function iniciarTemporizador() {
 
         if (gameTimerElement) gameTimerElement.textContent = str;
 
-        // PAUSA AUTOMÁTICA DE MEDIO TIEMPO A LOS 01:31 (91 Segundos transcurridos = 89s restantes)
         if (matchTime === 89 && !isHalfTimePaused) {
             pausaMedioTiempo();
         }
@@ -439,15 +461,15 @@ function iniciarTemporizador() {
 function pausaMedioTiempo() {
     isHalfTimePaused = true;
     isPaused = true;
-    halfTimeNotice.classList.remove("hidden");
-    pauseMenuOverlay.classList.remove("hidden");
+    if (halfTimeNotice) halfTimeNotice.classList.remove("hidden");
+    if (pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
 
     let cd = 30;
-    halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
+    if (halfTimeNotice) halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
 
     halfTimeTimer = setInterval(() => {
         cd--;
-        halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
+        if (halfTimeNotice) halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
         if (cd <= 0) {
             clearInterval(halfTimeTimer);
             cerrarPausa();
@@ -457,27 +479,28 @@ function pausaMedioTiempo() {
 
 function abrirPausa() {
     isPaused = true;
-    halfTimeNotice.classList.add("hidden");
-    pauseMenuOverlay.classList.remove("hidden");
+    if (halfTimeNotice) halfTimeNotice.classList.add("hidden");
+    if (pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
 }
 
 function cerrarPausa() {
     if (halfTimeTimer) clearInterval(halfTimeTimer);
     isPaused = false;
-    pauseMenuOverlay.classList.add("hidden");
+    isHalfTimePaused = false;
+    if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
 }
 
 function rendirsePartido() {
     cerrarPausa();
     clearInterval(timerInterval);
     cancelAnimationFrame(gameLoopId);
-    scoreCpu += 3; // Victoria por abandono
+    scoreCpu += 3;
     mostrarResumenFinal();
 }
 
 function ejecutarSustitucion() {
-    const target = subTargetSelect.value;
-    const replacementIdx = replacementSelect.value;
+    const target = subTargetSelect ? subTargetSelect.value : "P1";
+    const replacementIdx = replacementSelect ? replacementSelect.value : 0;
     const playerNewData = todosLosJugadores[replacementIdx];
 
     if (!playerNewData) return;
@@ -489,6 +512,7 @@ function ejecutarSustitucion() {
         team1.main.hp = 100;
         team1.main.nitro = 100;
         team1.main.stunnedUntil = 0;
+        hasPromptedSubP1 = false;
     } else {
         team2.main.name = playerNewData.name;
         team2.main.rating = playerNewData.rating;
@@ -496,24 +520,23 @@ function ejecutarSustitucion() {
         team2.main.hp = 100;
         team2.main.nitro = 100;
         team2.main.stunnedUntil = 0;
+        hasPromptedSubP2 = false;
     }
 
-    substitutionsModal.classList.add("hidden");
+    if (substitutionsModal) substitutionsModal.classList.add("hidden");
     cerrarPausa();
 }
 
 function resetPosiciones() {
-    // P1 Jugadores
+    if (!canvas) return;
     team1.main.x = 180; team1.main.y = canvas.height / 2;
     team1.defender.x = 110; team1.defender.y = canvas.height / 2;
     team1.gk.x = 30; team1.gk.y = canvas.height / 2;
 
-    // P2 / CPU Jugadores
     team2.main.x = 620; team2.main.y = canvas.height / 2;
     team2.defender.x = 690; team2.defender.y = canvas.height / 2;
     team2.gk.x = 770; team2.gk.y = canvas.height / 2;
 
-    // Balón
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
     ball.vx = 0;
@@ -529,22 +552,23 @@ function bucleJuego() {
 }
 
 function actualizarJuego() {
+    if (!canvas) return;
     const now = Date.now();
 
-    // Regeneración progresiva de resistencia
     if (team1.main.hp < 100) team1.main.hp = Math.min(100, team1.main.hp + 0.05);
     if (team2.main.hp < 100) team2.main.hp = Math.min(100, team2.main.hp + 0.05);
 
-    // Sugerir cambio al agotar la vida a 0
-    if (team1.main.hp <= 0 && !isPaused) {
-        subTargetSelect.value = "P1";
-        document.getElementById("subReasonText").textContent = `⚠️ ¡${team1.main.name} está agotado! Realiza un cambio:`;
+    if (team1.main.hp <= 0 && !hasPromptedSubP1 && !isPaused) {
+        hasPromptedSubP1 = true;
+        if (subTargetSelect) subTargetSelect.value = "P1";
+        const subReason = document.getElementById("subReasonText");
+        if (subReason) subReason.textContent = `⚠️ ¡${team1.main.name} está agotado! Realiza un cambio:`;
         abrirPausa();
-        pauseMenuOverlay.classList.add("hidden");
-        substitutionsModal.classList.remove("hidden");
+        if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
+        if (substitutionsModal) substitutionsModal.classList.remove("hidden");
     }
 
-    // --- CONTROLES Y MOVIMIENTO P1 ---
+    // P1 CONTROLES
     if (now > team1.main.stunnedUntil) {
         let dx1 = 0, dy1 = 0;
         if (keys["w"] || keys["W"]) dy1 -= 1;
@@ -574,7 +598,7 @@ function actualizarJuego() {
     team1.main.x = Math.max(team1.main.radius, Math.min(canvas.width - team1.main.radius, team1.main.x));
     team1.main.y = Math.max(team1.main.radius, Math.min(canvas.height - team1.main.radius, team1.main.y));
 
-    // --- CONTROLES Y MOVIMIENTO P2 / CPU ---
+    // P2 / CPU CONTROLES
     if (now > team2.main.stunnedUntil) {
         if (team2.main.isHuman) {
             let dx2 = 0, dy2 = 0;
@@ -601,11 +625,9 @@ function actualizarJuego() {
                 team2.main.y += (dy2 / mag) * team2.main.speed;
             }
         } else {
-            // CPU OFENSIVA: Avanza al campo contrario a atacar
             let targetX = ball.x;
             let targetY = ball.y;
 
-            // Si la CPU tiene la pelota o está en su propio campo, avanza agresivamente hacia el área rival
             if (ball.x > canvas.width * 0.3) {
                 targetX = ball.x;
                 targetY = ball.y;
@@ -627,23 +649,21 @@ function actualizarJuego() {
     team2.main.x = Math.max(team2.main.radius, Math.min(canvas.width - team2.main.radius, team2.main.x));
     team2.main.y = Math.max(team2.main.radius, Math.min(canvas.height - team2.main.radius, team2.main.y));
 
-    // MOVIMIENTO DE DEFENSA Y PORTERO (I.A. DE APOYO)
-    // Defensa P1 y P2 persiguen la pelota si entra en su área
+    // DEFENSA Y PORTERO
     team1.defender.y += (ball.y - team1.defender.y) * 0.05;
     team2.defender.y += (ball.y - team2.defender.y) * 0.05;
 
-    // Porteros cubren la portería verticalmente
     team1.gk.y += (ball.y - team1.gk.y) * 0.08;
     team2.gk.y += (ball.y - team2.gk.y) * 0.08;
     team1.gk.y = Math.max(canvas.height / 2 - 50, Math.min(canvas.height / 2 + 50, team1.gk.y));
     team2.gk.y = Math.max(canvas.height / 2 - 50, Math.min(canvas.height / 2 + 50, team2.gk.y));
 
-    // --- FÍSICA DE COLISIÓN RÍGIDA ENTRE JUGADORES (NO ATRAVESAR) ---
+    // COLISIÓN SÓLIDA
     resolverColisionSolida(team1.main, team2.main);
     resolverColisionSolida(team1.main, team2.defender);
     resolverColisionSolida(team2.main, team1.defender);
 
-    // --- PELOTA PEGADA / CONTROL ---
+    // BALÓN PEGADO
     let distP1Ball = Math.hypot(ball.x - team1.main.x, ball.y - team1.main.y);
     let distP2Ball = Math.hypot(ball.x - team2.main.x, ball.y - team2.main.y);
     let pelotaPegada = false;
@@ -655,7 +675,7 @@ function actualizarJuego() {
         ball.vx = 0; ball.vy = 0;
     }
     
-    const cpuCanControl = (!team2.main.isHuman && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
+    const cpuCanControl = (!team2.main.isHuman && difficultySelect && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
     if ((keys["k"] || keys["K"] || cpuCanControl) && !pelotaPegada && distP2Ball < team2.main.radius + ball.radius + 15 && now > team2.main.stunnedUntil) {
         pelotaPegada = true;
         ball.x = team2.main.x + team2.main.lastDirX * (team2.main.radius + ball.radius + 2);
@@ -663,13 +683,13 @@ function actualizarJuego() {
         ball.vx = 0; ball.vy = 0;
     }
 
-    // --- ENTRADAS DEFENSIVAS REALISTAS (SACAR BALÓN SIN AUTO-RESTAR VIDA) ---
+    // ENTRADAS
     if ((keys["x"] || keys["X"]) && now > team1.main.stunnedUntil) {
         if (distP2Ball < team1.main.radius + ball.radius + 30) {
             let angle = Math.atan2(ball.y - team1.main.y, ball.x - team1.main.x);
             ball.vx = Math.cos(angle) * 15;
             ball.vy = Math.sin(angle) * 15;
-            team1.main.hp = Math.max(0, team1.main.hp - 5); // Consumo de energía por barrida
+            team1.main.hp = Math.max(0, team1.main.hp - 5);
         }
     }
 
@@ -683,7 +703,7 @@ function actualizarJuego() {
         }
     }
 
-    // --- FÍSICAS DEL BALÓN ---
+    // FÍSICAS DE LA PELOTA
     if (!pelotaPegada) {
         ball.x += ball.vx;
         ball.y += ball.vy;
@@ -713,7 +733,7 @@ function actualizarJuego() {
         resolverColisionEntidadBalon(team2.gk);
     }
 
-    // --- DISPAROS Y POWERSHOT ---
+    // TIROS
     if ((keys["c"] || keys["C"]) && distP1Ball < team1.main.radius + ball.radius + 20) {
         let angle = Math.atan2(ball.y - team1.main.y, ball.x - team1.main.x);
         ball.vx = Math.cos(angle) * 10;
@@ -741,7 +761,7 @@ function actualizarJuego() {
         team2.main.lastPowerShot = now;
     }
 
-    // --- PORTERÍAS Y GOLES ---
+    // GOLES
     const goalTop = canvas.height / 2 - 60;
     const goalBottom = canvas.height / 2 + 60;
 
@@ -768,14 +788,13 @@ function actualizarJuego() {
     }
 }
 
-// Colisión Sólida (Empuje Físico sin Atravesar)
 function resolverColisionSolida(p1, p2) {
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
     let dist = Math.hypot(dx, dy);
     let minDist = p1.radius + p2.radius;
 
-    if (dist < minDist && dist > 0) {
+    if (dist < minDist && dist > 0.001) {
         let overlap = minDist - dist;
         let nx = dx / dist;
         let ny = dy / dist;
@@ -805,30 +824,38 @@ function resolverColisionEntidadBalon(entidad) {
 
 function mostrarResumenFinal() {
     isPaused = true;
-    document.getElementById("finalScoreTitle").textContent = `${team1.main.name} ${scoreP1} - ${scoreCpu} ${team2.main.name}`;
+    const scoreTitle = document.getElementById("finalScoreTitle");
+    if (scoreTitle) scoreTitle.textContent = `${team1.main.name} ${scoreP1} - ${scoreCpu} ${team2.main.name}`;
 
-    // Cálculo de Valoraciones
     let ratingP1 = (7.0 + team1.main.goals * 1.5).toFixed(1);
     let ratingP2 = (7.0 + team2.main.goals * 1.5).toFixed(1);
 
-    document.getElementById("p1BestName").textContent = team1.main.name;
-    document.getElementById("p1BestRating").textContent = `VALORACIÓN: ${ratingP1}`;
+    const p1NameElem = document.getElementById("p1BestName");
+    const p1RatingElem = document.getElementById("p1BestRating");
+    if (p1NameElem) p1NameElem.textContent = team1.main.name;
+    if (p1RatingElem) p1RatingElem.textContent = `VALORACIÓN: ${ratingP1}`;
 
-    document.getElementById("p2BestName").textContent = team2.main.name;
-    document.getElementById("p2BestRating").textContent = `VALORACIÓN: ${ratingP2}`;
+    const p2NameElem = document.getElementById("p2BestName");
+    const p2RatingElem = document.getElementById("p2BestRating");
+    if (p2NameElem) p2NameElem.textContent = team2.main.name;
+    if (p2RatingElem) p2RatingElem.textContent = `VALORACIÓN: ${ratingP2}`;
+
+    const mvpNameElem = document.getElementById("mvpName");
+    const mvpScoreElem = document.getElementById("mvpScore");
 
     if (parseFloat(ratingP1) >= parseFloat(ratingP2)) {
-        document.getElementById("mvpName").textContent = team1.main.name;
-        document.getElementById("mvpScore").textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP1}`;
+        if (mvpNameElem) mvpNameElem.textContent = team1.main.name;
+        if (mvpScoreElem) mvpScoreElem.textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP1}`;
     } else {
-        document.getElementById("mvpName").textContent = team2.main.name;
-        document.getElementById("mvpScore").textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP2}`;
+        if (mvpNameElem) mvpNameElem.textContent = team2.main.name;
+        if (mvpScoreElem) mvpScoreElem.textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP2}`;
     }
 
-    finalSummaryOverlay.classList.remove("hidden");
+    if (finalSummaryOverlay) finalSummaryOverlay.classList.remove("hidden");
 }
 
 function dibujarJuego() {
+    if (!ctx || !canvas) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (imgPitch.complete && imgPitch.naturalWidth > 0) {
@@ -838,17 +865,14 @@ function dibujarJuego() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Dibujar Jugadores P1 (Azul/Cian)
     dibujarJugadorCanvas(team1.main, imgP1Badge, "#00ffff");
     dibujarJugadorCanvas(team1.defender, imgP1Badge, "#00cccc");
     dibujarJugadorCanvas(team1.gk, imgP1Badge, "#ffcc00");
 
-    // Dibujar Jugadores P2 / CPU (Rojo)
     dibujarJugadorCanvas(team2.main, imgCpuBadge, "#ff0055");
     dibujarJugadorCanvas(team2.defender, imgCpuBadge, "#cc0044");
     dibujarJugadorCanvas(team2.gk, imgCpuBadge, "#ffcc00");
 
-    // Dibujar Balón
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
@@ -857,13 +881,11 @@ function dibujarJuego() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Marcador
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 22px Poppins, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`${team1.main.name} ${scoreP1} - ${scoreCpu} ${team2.main.name}`, canvas.width / 2, 35);
 
-    // Indicadores Superiores
     ctx.fillStyle = "#00ffff";
     ctx.fillRect(20, 15, team1.main.nitro * 1.2, 6);
     ctx.fillStyle = "#2ecc71";
@@ -880,6 +902,7 @@ function dibujarJuego() {
 }
 
 function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
+    if (!ctx) return;
     ctx.save();
     ctx.beginPath();
     ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
@@ -907,20 +930,23 @@ function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
     }
 }
 
-// EVENTOS DE LA SPA
-searchButton.addEventListener("click", buscarJugador);
-searchInput.addEventListener("keyup", () => { buscarJugador(); });
-nextBtn.addEventListener("click", () => {
-    if (offset + limite < jugadoresFiltrados.length) {
-        offset += limite;
-        renderizarPaginaActual();
-    }
-});
-previousBtn.addEventListener("click", () => {
-    if (offset - limite >= 0) {
-        offset -= limite;
-        renderizarPaginaActual();
-    }
-});
+if (searchButton) searchButton.addEventListener("click", buscarJugador);
+if (searchInput) searchInput.addEventListener("keyup", () => { buscarJugador(); });
+if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+        if (offset + limite < jugadoresFiltrados.length) {
+            offset += limite;
+            renderizarPaginaActual();
+        }
+    });
+}
+if (previousBtn) {
+    previousBtn.addEventListener("click", () => {
+        if (offset - limite >= 0) {
+            offset -= limite;
+            renderizarPaginaActual();
+        }
+    });
+}
 
 cargarDatosAPI();
