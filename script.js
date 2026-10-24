@@ -1,29 +1,50 @@
+// ===========================================
+// DLS 26 CARDS SPA & MINIJUEGO
+// API Local: dls26-cards.json
+// ===========================================
+
 const URL = './dls26-cards.json';
+
+// ==============================
+// VARIABLES DE DATOS Y PAGINACIÓN
+// ==============================
 
 let todosLosJugadores = [];
 let jugadoresFiltrados = [];
 let offset = 0;
 const limite = 8;
 
-// DOM Elements
+// ==============================
+// ELEMENTOS DEL DOM
+// ==============================
+
 const playerContainer = document.getElementById("playerContainer");
 const detailContainer = document.getElementById("detailContainer");
+
 const previousBtn = document.getElementById("previousBtn");
 const nextBtn = document.getElementById("nextBtn");
+
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
+
 const loading = document.getElementById("loading");
 const errorMessage = document.getElementById("errorMessage");
+
 const playerCounter = document.getElementById("playerCounter");
 
-// Music Player
+// Mini Reproductor DOM
 const audioTrack = document.getElementById("audioTrack");
 const playPauseBtn = document.getElementById("playPauseBtn");
 const trackSelect = document.getElementById("trackSelect");
 const trackTitle = document.getElementById("trackTitle");
 
+// ==============================
+// LÓGICA DEL REPRODUCTOR
+// ==============================
+
 function inicializarReproductor(playlist) {
     if (!playlist || playlist.length === 0) return;
+
     trackSelect.innerHTML = "";
     playlist.forEach(track => {
         const option = document.createElement("option");
@@ -31,6 +52,7 @@ function inicializarReproductor(playlist) {
         option.textContent = track.title;
         trackSelect.appendChild(option);
     });
+
     audioTrack.src = playlist[0].file;
     trackTitle.textContent = `🎵 ${playlist[0].title}`;
 }
@@ -45,459 +67,756 @@ playPauseBtn.addEventListener("click", () => {
     }
 });
 
-function mostrarLoading() { loading.classList.remove("hidden"); }
-function ocultarLoading() { loading.classList.add("hidden"); }
+trackSelect.addEventListener("change", (e) => {
+    const selectedFile = e.target.value;
+    const selectedText = e.target.options[e.target.selectedIndex].text;
+
+    audioTrack.src = selectedFile;
+    trackTitle.textContent = `🎵 ${selectedText}`;
+
+    audioTrack.play();
+    playPauseBtn.textContent = "⏸";
+});
+
+// ==============================
+// MAPEO DE COLORES POR POSICIÓN Y ATRIBUTO
+// ==============================
+
+function obtenerClasePosicion(posicion) {
+    if (!posicion) return "pos-default";
+    const pos = posicion.toUpperCase();
+
+    if (["GK", "POR"].includes(pos)) return "pos-gk";
+    if (["DC", "SD", "EI", "ED"].includes(pos)) return "pos-del";
+    if (["DFC", "LD", "LI"].includes(pos)) return "pos-def";
+    if (["MC", "CAI", "CAD", "MCO", "MCD"].includes(pos)) return "pos-med";
+
+    return "pos-default";
+}
+
+function obtenerColorStat(valor) {
+    if (valor === 0) return "#ff66cc";       // Rosa (0)
+    if (valor < 60) return "#ff3333";        // Rojo (1-59)
+    if (valor < 70) return "#ff9900";        // Naranja (60-69)
+    if (valor < 80) return "#ffd700";        // Dorado (70-79)
+    if (valor < 90) return "#2ecc71";        // Verde (80-89)
+    return "#00bfff";                        // Celeste (90-100)
+}
+
+// ==============================
+// ESTADOS (LOADING / ERROR)
+// ==============================
+
+function mostrarLoading() {
+    loading.classList.remove("hidden");
+}
+
+function ocultarLoading() {
+    loading.classList.add("hidden");
+}
+
+function mostrarError(texto = "Error de procesamiento.") {
+    errorMessage.textContent = texto;
+    errorMessage.classList.remove("hidden");
+
+    setTimeout(() => {
+        errorMessage.classList.add("hidden");
+    }, 2500);
+}
+
+// ==============================
+// OBTENER DATOS DE LA API
+// ==============================
 
 async function cargarDatosAPI() {
     mostrarLoading();
+
     try {
         const respuesta = await fetch(URL);
+        if (!respuesta.ok) throw new Error("No se pudo cargar la API");
+
         const data = await respuesta.json();
+
         if (data.playlist) {
             inicializarReproductor(data.playlist);
             todosLosJugadores = data.players || [];
         } else {
             todosLosJugadores = Array.isArray(data) ? data : [];
         }
+
         jugadoresFiltrados = [...todosLosJugadores];
+        
         pobladorSelectorJugadores();
         renderizarPaginaActual();
         inicializarJuegoCanvas();
     } catch (error) {
-        console.error(error);
+        mostrarError("Error cargando la base de datos.");
     }
+
     ocultarLoading();
 }
+
+// ==============================
+// RENDERIZAR PÁGINA
+// ==============================
 
 function renderizarPaginaActual() {
     playerContainer.innerHTML = "";
     playerCounter.textContent = `${jugadoresFiltrados.length} Jugadores`;
+
+    if (jugadoresFiltrados.length === 0) {
+        playerContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">No se encontraron resultados.</p>`;
+        return;
+    }
+
     const corte = jugadoresFiltrados.slice(offset, offset + limite);
     corte.forEach(jugador => crearCard(jugador));
+
     previousBtn.disabled = offset === 0;
     nextBtn.disabled = offset + limite >= jugadoresFiltrados.length;
 }
 
+// ==============================
+// TARJETAS
+// ==============================
+
 function crearCard(player) {
     const card = document.createElement("article");
     card.classList.add("card");
+
+    const clasePosicion = obtenerClasePosicion(player.position);
+    const bandera = player.country?.flag ? player.country.flag : '';
+
     card.innerHTML = `
         <div class="card-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" onerror="this.src='./download.jpg';">
+            <img src="${player.image}" alt="${player.name}" class="player-img" onerror="this.onerror=null; this.src='./download.jpg';">
         </div>
         <div class="card-body">
+            <span class="id">#${player.year || ''} • ${bandera}</span>
             <h3>${player.name}</h3>
-            <p><strong>${player.team}</strong> - ${player.position}</p>
-            <p><strong>OVR:</strong> ${player.rating}</p>
-            <button class="btn-info">Ver Info</button>
+            <p><strong>${player.team}</strong></p>
+            <span class="tipo ${clasePosicion}">${player.position}</span>
+            <span class="tipo dark">${player.rating} OVR</span>
+            <button class="btn-info">Ver Información</button>
         </div>
     `;
-    card.querySelector(".btn-info").addEventListener("click", () => mostrarDetalle(player));
+
+    card.querySelector(".btn-info").addEventListener("click", () => {
+        mostrarDetalle(player);
+    });
+
     playerContainer.appendChild(card);
 }
 
+// ==============================
+// DETALLE DEL JUGADOR
+// ==============================
+
 function mostrarDetalle(player) {
+    const posUpper = player.position ? player.position.toUpperCase() : "";
+    const esPortero = posUpper === "GK" || posUpper === "POR";
+    const clasePosicion = obtenerClasePosicion(player.position);
+
+    let statsHTML = "";
+
+    if (player.stats) {
+        if (player.stats.physical) {
+            statsHTML += renderBarraStat("Velocidad", player.stats.physical.speed);
+            statsHTML += renderBarraStat("Aceleración", player.stats.physical.acceleration);
+            if (!esPortero) {
+                statsHTML += renderBarraStat("Resistencia", player.stats.physical.stamina);
+            }
+            statsHTML += renderBarraStat("Fuerza", player.stats.physical.strength);
+        }
+
+        if (player.stats.technical) {
+            statsHTML += renderBarraStat("Control", player.stats.technical.control);
+            statsHTML += renderBarraStat("Pases", player.stats.technical.passing);
+            if (!esPortero) {
+                statsHTML += renderBarraStat("Tiro", player.stats.technical.shooting);
+            }
+            statsHTML += renderBarraStat("Entrada", player.stats.technical.tackling);
+        }
+
+        if (esPortero && player.stats.goalkeeping) {
+            statsHTML += renderBarraStat("Reflejos", player.stats.goalkeeping.reflexes);
+            statsHTML += renderBarraStat("Paradas", player.stats.goalkeeping.handling);
+        }
+    }
+
     detailContainer.innerHTML = `
-        <h2>${player.name}</h2>
+        <div class="detail-img-wrapper">
+            <img src="${player.image}" alt="${player.name}" class="detail-player-img" onerror="this.src='./download.jpg'">
+        </div>
+        <h2>${player.name} ${player.country ? player.country.flag : ''}</h2>
+        <p><strong>Posición:</strong> <span class="tipo ${clasePosicion}">${player.position}</span> | <strong>Media:</strong> ${player.rating}</p>
         <p><strong>Equipo:</strong> ${player.team}</p>
-        <p><strong>Posición:</strong> ${player.position}</p>
-        <p><strong>Valoración:</strong> ${player.rating}</p>
+        <p><strong>País:</strong> ${player.country ? `${player.country.name}${player.country.flag}` : 'N/A'}</p>
+        <p><strong>Tipo de carta:</strong> ${player.cardType || 'Estándar'} (${player.year || ''})</p>
+        <p><strong>Pie preferido:</strong> ${player.preferredFoot || 'N/A'} ${player.heightCm ? `| <strong>Altura:</strong> ${player.heightCm} cm` : ''}</p>
+
+        <div class="stats">
+            <h3>Atributos</h3>
+            ${statsHTML}
+        </div>
     `;
 }
 
-// ===============================================
-// LÓGICA DEL JUEGO
-// ===============================================
+function renderBarraStat(label, valor) {
+    if (valor === undefined) return '';
+    const color = obtenerColorStat(valor);
+    return `
+        <div class="stat">
+            <div class="stat-header">
+                <span>${label}</span>
+                <span style="color: ${color};">${valor}</span>
+            </div>
+            <div class="progress">
+                <span style="width: ${Math.min(valor, 100)}%; background-color: ${color};"></span>
+            </div>
+        </div>
+    `;
+}
+
+// ==============================
+// BUSCADOR EN TIEMPO REAL
+// ==============================
+
+function buscarJugador() {
+    const busqueda = searchInput.value.trim().toLowerCase();
+
+    jugadoresFiltrados = todosLosJugadores.filter(p =>
+        p.name?.toLowerCase().includes(busqueda) ||
+        p.team?.toLowerCase().includes(busqueda) ||
+        (p.country && p.country.name?.toLowerCase().includes(busqueda)) ||
+        p.position?.toLowerCase().includes(busqueda) ||
+        (p.cardType && p.cardType.toLowerCase().includes(busqueda)) ||
+        (p.rating !== undefined && String(p.rating).includes(busqueda))
+    );
+
+    offset = 0;
+    renderizarPaginaActual();
+}
+
+// ===========================================
+// LÓGICA Y MOTOR DEL MINIJUEGO DLS
+// ===========================================
+
+const gameModeSelect = document.getElementById("gameModeSelect");
+const playerSelect = document.getElementById("playerSelect");
+const player2Select = document.getElementById("player2Select");
+const p2PlayerGroup = document.getElementById("p2PlayerGroup");
+const difficultyGroup = document.getElementById("difficultyGroup");
+const p1BadgeSelect = document.getElementById("p1BadgeSelect");
+const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
+const difficultySelect = document.getElementById("difficultySelect");
+const startGameBtn = document.getElementById("startGameBtn");
+const gameTimerElement = document.getElementById("gameTimer");
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 let gameLoopId = null;
 let timerInterval = null;
-let matchTime = 180;
-let isPaused = false;
+let matchTime = 180; // 3 minutos
+
+let imgP1Badge = new Image();
+let imgCpuBadge = new Image();
+
+let imgPitch = new Image();
+imgPitch.src = './FUT.jpg';
 
 let keys = {};
-let scoreP1 = 0;
-let scoreP2 = 0;
 
-let statsGame = {
-    p1Possession: 0, p2Possession: 0,
-    p1Shots: 0, p2Shots: 0,
-    p1Tackles: 0, p2Tackles: 0,
-    p1Passes: 0, p2Passes: 0,
-    p1Time: 0, p2Time: 0,
-    mvp: null
+let scoreP1 = 0;
+let scoreCpu = 0;
+const POWERSHOT_COOLDOWN = 20000; // 20s
+
+let player1 = {
+    x: 180,
+    y: 225,
+    radius: 20,
+    baseSpeed: 4,
+    speed: 4,
+    name: "Jugador 1",
+    rating: 80,
+    lastDirX: 1,
+    lastDirY: 0,
+    nitro: 100,
+    lastPowerShot: 0
 };
 
-let team1 = { gk: null, def: null, med: null, del: null };
-let team2 = { gk: null, def: null, med: null, del: null };
+let p2OrCpu = {
+    x: 620,
+    y: 225,
+    radius: 20,
+    baseSpeed: 3.5,
+    speed: 3.5,
+    name: "CPU Bot",
+    rating: 80,
+    lastDirX: -1,
+    lastDirY: 0,
+    nitro: 100,
+    lastPowerShot: 0,
+    reactionRate: 0.05,
+    isHuman: false
+};
 
-function crearEntidad(data, role, defaultX, defaultY) {
-    return {
-        x: defaultX, y: defaultY,
-        baseX: defaultX, baseY: defaultY,
-        radius: 16,
-        speed: 3.5,
-        name: data ? data.name : role,
-        rating: data ? data.rating : 80,
-        image: data ? data.image : '',
-        role: role,
-        energy: 100,
-        nitro: 100,
-        lastPowerShot: 0,
-        lastDirX: 0, lastDirY: 0
-    };
-}
-
-let ball = { x: 425, y: 240, radius: 9, vx: 0, vy: 0, friction: 0.94, holder: null };
+let ball = {
+    x: 400,
+    y: 225,
+    radius: 10,
+    vx: 0,
+    vy: 0,
+    friction: 0.94,
+    maxSpeed: 18
+};
 
 function pobladorSelectorJugadores() {
-    const p1Gk = document.getElementById("p1GkSelect");
-    const p1Def = document.getElementById("p1DefSelect");
-    const p1Med = document.getElementById("p1MedSelect");
-    const p1Del = document.getElementById("p1DelSelect");
-    const p2Gk = document.getElementById("p2GkSelect");
-    const p2Def = document.getElementById("p2DefSelect");
-    const p2Med = document.getElementById("p2MedSelect");
-    const p2Del = document.getElementById("p2DelSelect");
-
-    const selects = [p1Gk, p1Def, p1Med, p1Del, p2Gk, p2Def, p2Med, p2Del];
-    selects.forEach(s => s.innerHTML = "");
-
-    todosLosJugadores.forEach((p, idx) => {
-        const opt = document.createElement("option");
-        opt.value = idx;
-        opt.textContent = `${p.name} (${p.rating} - ${p.position})`;
-        const pos = (p.position || "").toUpperCase();
-
-        if (pos === "GK" || pos === "POR") {
-            p1Gk.appendChild(opt.cloneNode(true));
-            p2Gk.appendChild(opt.cloneNode(true));
-        } else if (["DFC", "DEF", "LD", "LI"].includes(pos)) {
-            p1Def.appendChild(opt.cloneNode(true));
-            p2Def.appendChild(opt.cloneNode(true));
-        } else if (["MC", "MED", "MCO", "MCD"].includes(pos)) {
-            p1Med.appendChild(opt.cloneNode(true));
-            p2Med.appendChild(opt.cloneNode(true));
-        } else {
-            p1Del.appendChild(opt.cloneNode(true));
-            p2Del.appendChild(opt.cloneNode(true));
+    if (!playerSelect) return;
+    playerSelect.innerHTML = "";
+    if (player2Select) player2Select.innerHTML = "";
+    
+    todosLosJugadores.forEach((p, index) => {
+        const option = document.createElement("option");
+        option.value = index;
+        const nacion = p.country?.flag ? p.country.flag : '';
+        option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
+        
+        playerSelect.appendChild(option);
+        if (player2Select) {
+            const opt2 = option.cloneNode(true);
+            player2Select.appendChild(opt2);
         }
     });
 
-    pobladorSubstituciones();
-}
-
-function pobladorSubstituciones() {
-    const subP1Def = document.getElementById("subP1Def");
-    const subP1Med = document.getElementById("subP1Med");
-    const subP1Del = document.getElementById("subP1Del");
-    const subP2Def = document.getElementById("subP2Def");
-    const subP2Med = document.getElementById("subP2Med");
-    const subP2Del = document.getElementById("subP2Del");
-
-    const subSelects = [subP1Def, subP1Med, subP1Del, subP2Def, subP2Med, subP2Del];
-    subSelects.forEach(s => s.innerHTML = "");
-
-    todosLosJugadores.forEach((p, idx) => {
-        const opt = document.createElement("option");
-        opt.value = idx;
-        opt.textContent = `${p.name} (${p.rating})`;
-        subSelects.forEach(s => s.appendChild(opt.cloneNode(true)));
-    });
+    if (player2Select && player2Select.options.length > 1) {
+        player2Select.selectedIndex = 1;
+    }
 }
 
 function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => { keys[e.key] = true; });
     window.addEventListener("keyup", e => { keys[e.key] = false; });
 
-    document.getElementById("startGameBtn").addEventListener("click", reiniciarPartido);
-    document.getElementById("pauseBtn").addEventListener("click", pausarJuego);
-    document.getElementById("resumeBtn").addEventListener("click", reanudarJuego);
-
-    document.getElementById("gestionarEquipoBtn").addEventListener("click", () => {
-        document.getElementById("pauseModal").classList.add("hidden");
-        document.getElementById("subModal").classList.remove("hidden");
+    gameModeSelect.addEventListener("change", () => {
+        if (gameModeSelect.value === "2P") {
+            p2PlayerGroup.style.display = "flex";
+            difficultyGroup.style.display = "none";
+        } else {
+            p2PlayerGroup.style.display = "none";
+            difficultyGroup.style.display = "flex";
+        }
     });
 
-    document.getElementById("closeSubBtn").addEventListener("click", () => {
-        document.getElementById("subModal").classList.add("hidden");
-        document.getElementById("pauseModal").classList.remove("hidden");
-    });
-
-    document.getElementById("applySubP1").addEventListener("click", () => {
-        const defP = todosLosJugadores[document.getElementById("subP1Def").value];
-        const medP = todosLosJugadores[document.getElementById("subP1Med").value];
-        const delP = todosLosJugadores[document.getElementById("subP1Del").value];
-        if (defP) team1.def = crearEntidad(defP, 'DEF', team1.def.x, team1.def.y);
-        if (medP) team1.med = crearEntidad(medP, 'MED', team1.med.x, team1.med.y);
-        if (delP) team1.del = crearEntidad(delP, 'DEL', team1.del.x, team1.del.y);
-        alert("¡Sustituciones P1 realizadas!");
-    });
-
-    document.getElementById("estadisticasBtn").addEventListener("click", mostrarModalStats);
-    document.getElementById("closeStatsBtn").addEventListener("click", () => {
-        document.getElementById("statsModal").classList.add("hidden");
-    });
+    startGameBtn.addEventListener("click", reiniciarPartido);
 }
 
 function reiniciarPartido() {
-    const p1Gk = todosLosJugadores[document.getElementById("p1GkSelect").value];
-    const p1Def = todosLosJugadores[document.getElementById("p1DefSelect").value];
-    const p1Med = todosLosJugadores[document.getElementById("p1MedSelect").value];
-    const p1Del = todosLosJugadores[document.getElementById("p1DelSelect").value];
+    // Configurar P1
+    const p1Idx = playerSelect.value;
+    const p1Data = todosLosJugadores[p1Idx] || { name: "Jugador 1", rating: 85 };
+    player1.name = p1Data.name;
+    player1.rating = p1Data.rating;
+    player1.baseSpeed = 3.5 + (player1.rating / 100) * 2.2;
+    player1.nitro = 100;
+    player1.lastPowerShot = 0;
 
-    const p2Gk = todosLosJugadores[document.getElementById("p2GkSelect").value];
-    const p2Def = todosLosJugadores[document.getElementById("p2DefSelect").value];
-    const p2Med = todosLosJugadores[document.getElementById("p2MedSelect").value];
-    const p2Del = todosLosJugadores[document.getElementById("p2DelSelect").value];
+    imgP1Badge.src = p1BadgeSelect.value;
+    imgCpuBadge.src = cpuBadgeSelect.value;
 
-    team1.gk = crearEntidad(p1Gk, 'GK', 50, 240);
-    team1.def = crearEntidad(p1Def, 'DEF', 180, 240);
-    team1.med = crearEntidad(p1Med, 'MED', 300, 240);
-    team1.del = crearEntidad(p1Del, 'DEL', 380, 240);
+    // Configurar P2 o CPU
+    if (gameModeSelect.value === "2P") {
+        p2OrCpu.isHuman = true;
+        const p2Idx = player2Select.value;
+        const p2Data = todosLosJugadores[p2Idx] || { name: "Jugador 2", rating: 85 };
+        p2OrCpu.name = p2Data.name;
+        p2OrCpu.rating = p2Data.rating;
+        p2OrCpu.baseSpeed = 3.5 + (p2OrCpu.rating / 100) * 2.2;
+    } else {
+        p2OrCpu.isHuman = false;
+        p2OrCpu.name = "CPU Bot";
+        const diff = difficultySelect.value;
+        if (diff === "fácil") {
+            p2OrCpu.baseSpeed = 2.5;
+            p2OrCpu.reactionRate = 0.03;
+        } else if (diff === "normal") {
+            p2OrCpu.baseSpeed = 3.6;
+            p2OrCpu.reactionRate = 0.06;
+        } else { // difícil
+            p2OrCpu.baseSpeed = 4.8;
+            p2OrCpu.reactionRate = 0.1;
+        }
+    }
+    p2OrCpu.nitro = 100;
+    p2OrCpu.lastPowerShot = 0;
 
-    team2.gk = crearEntidad(p2Gk, 'GK', 800, 240);
-    team2.def = crearEntidad(p2Def, 'DEF', 670, 240);
-    team2.med = crearEntidad(p2Med, 'MED', 550, 240);
-    team2.del = crearEntidad(p2Del, 'DEL', 470, 240);
-
-    scoreP1 = 0; scoreP2 = 0;
-    statsGame = { p1Possession: 0, p2Possession: 0, p1Shots: 0, p2Shots: 0, p1Tackles: 0, p2Tackles: 0, p1Passes: 0, p2Passes: 0, p1Time: 0, p2Time: 0 };
     resetPosiciones();
+    scoreP1 = 0;
+    scoreCpu = 0;
+
     iniciarTemporizador();
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
-    isPaused = false;
     bucleJuego();
 }
 
 function iniciarTemporizador() {
     clearInterval(timerInterval);
-    matchTime = 180;
+    matchTime = 180; // 3 minutos
+
     timerInterval = setInterval(() => {
-        if (!isPaused) {
-            matchTime--;
-            let m = Math.floor(matchTime / 60);
-            let s = matchTime % 60;
-            document.getElementById("gameTimer").textContent = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-            if (matchTime <= 0) {
-                clearInterval(timerInterval);
-                cancelAnimationFrame(gameLoopId);
-                mostrarModalStats();
-            }
+        matchTime--;
+
+        let m = Math.floor(matchTime / 60);
+        let s = matchTime % 60;
+        let str = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+
+        if (gameTimerElement) gameTimerElement.textContent = str;
+
+        if (matchTime <= 0) {
+            clearInterval(timerInterval);
+            cancelAnimationFrame(gameLoopId);
+            alert(`¡FIN DEL PARTIDO!\nResultado: ${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`);
         }
     }, 1000);
 }
 
-function pausarJuego() {
-    isPaused = true;
-    document.getElementById("p1PauseScore").textContent = scoreP1;
-    document.getElementById("p2PauseScore").textContent = scoreP2;
-    document.getElementById("pauseModal").classList.remove("hidden");
-}
-
-function reanudarJuego() {
-    isPaused = false;
-    document.getElementById("pauseModal").classList.add("hidden");
-}
-
 function resetPosiciones() {
-    ball.x = 425; ball.y = 240; ball.vx = 0; ball.vy = 0; ball.holder = null;
-    team1.gk.x = 50; team1.gk.y = 240;
-    team1.def.x = 180; team1.def.y = 240;
-    team1.med.x = 300; team1.med.y = 240;
-    team1.del.x = 380; team1.del.y = 240;
+    player1.x = 180;
+    player1.y = canvas.height / 2;
+    
+    p2OrCpu.x = canvas.width - 180;
+    p2OrCpu.y = canvas.height / 2;
 
-    team2.gk.x = 800; team2.gk.y = 240;
-    team2.def.x = 670; team2.def.y = 240;
-    team2.med.x = 550; team2.med.y = 240;
-    team2.del.x = 470; team2.del.y = 240;
+    ball.x = canvas.width / 2;
+    ball.y = canvas.height / 2;
+    ball.vx = 0;
+    ball.vy = 0;
 }
 
 function bucleJuego() {
-    if (!isPaused) {
-        actualizarJuego();
-        dibujarJuego();
-    }
+    actualizarJuego();
+    dibujarJuego();
     gameLoopId = requestAnimationFrame(bucleJuego);
 }
 
 function actualizarJuego() {
-    // --- CONTROLES PORTEROS ---
-    if (keys["f"] || keys["F"]) team1.gk.x = Math.min(100, team1.gk.x + 3);
-    if (keys["g"] || keys["G"]) team1.gk.x = Math.max(20, team1.gk.x - 3);
-    if (keys["l"] || keys["L"]) team2.gk.x = Math.max(750, team2.gk.x - 3);
-    if (keys["k"] || keys["K"]) team2.gk.x = Math.min(830, team2.gk.x + 3);
+    const now = Date.now();
 
-    // --- JUGADOR CONTROLADO P1 (Delantero) ---
-    let speed1 = team1.del.speed * (team1.del.energy / 100);
+    // --- CONTROLES Y MOVIMIENTO PLAYER 1 ---
+    let dx1 = 0, dy1 = 0;
+    if (keys["ArrowUp"]) dy1 -= 1;
+    if (keys["ArrowDown"]) dy1 += 1;
+    if (keys["ArrowLeft"]) dx1 -= 1;
+    if (keys["ArrowRight"]) dx1 += 1;
+
+    // Nitro (P1: Q)
     if (keys["q"] || keys["Q"]) {
-        if (team1.del.nitro > 0) { speed1 *= 1.5; team1.del.nitro -= 0.5; }
-    } else { team1.del.nitro = Math.min(100, team1.del.nitro + 0.2); }
-
-    if (keys["w"] || keys["W"]) team1.del.y -= speed1;
-    if (keys["s"] || keys["S"]) team1.del.y += speed1;
-    if (keys["a"] || keys["A"]) team1.del.x -= speed1;
-    if (keys["d"] || keys["D"]) team1.del.x += speed1;
-
-    team1.del.energy = Math.max(10, team1.del.energy - 0.005);
-
-    // AI COMPAÑEROS P1
-    movimientoAIAvanzado(team1.def, ball, 150, 600, 1);
-    movimientoAIAvanzado(team1.med, ball, 250, 700, 1);
-
-    // --- CONTROLES / AI P2 ---
-    const is2P = document.getElementById("gameModeSelect").value === "2P";
-    if (is2P) {
-        let speed2 = team2.del.speed * (team2.del.energy / 100);
-        if (keys["ArrowUp"]) team2.del.y -= speed2;
-        if (keys["ArrowDown"]) team2.del.y += speed2;
-        if (keys["ArrowLeft"]) team2.del.x -= speed2;
-        if (keys["ArrowRight"]) team2.del.x += speed2;
-        movimientoAIAvanzado(team2.def, ball, 250, 700, -1);
-        movimientoAIAvanzado(team2.med, ball, 150, 600, -1);
+        if (player1.nitro > 0) {
+            player1.speed = player1.baseSpeed * 1.6;
+            player1.nitro = Math.max(0, player1.nitro - 0.8);
+        } else {
+            player1.speed = player1.baseSpeed;
+        }
     } else {
-        movimientoAIAvanzado(team2.def, ball, 200, 650, -1);
-        movimientoAIAvanzado(team2.med, ball, 150, 550, -1);
-        movimientoAIAvanzado(team2.del, ball, 50, 450, -1);
-
-        // Pase CPU inteligente
-        if (ball.holder === team2.del && Math.random() < 0.01) {
-            let target = Math.random() > 0.5 ? team2.med : team2.def;
-            let angle = Math.atan2(target.y - team2.del.y, target.x - team2.del.x);
-            ball.holder = null;
-            ball.vx = Math.cos(angle) * 8;
-            ball.vy = Math.sin(angle) * 8;
-            statsGame.p2Passes++;
-        }
+        player1.speed = player1.baseSpeed;
+        player1.nitro = Math.min(100, player1.nitro + 0.2); // Recarga progresiva
     }
 
-    // DISPAROS P1 (E) / P2 (M)
-    if (keys["e"] || keys["E"]) {
-        if (Math.hypot(ball.x - team1.del.x, ball.y - team1.del.y) < 30) {
-            ball.holder = null;
-            ball.vx = 12; ball.vy = (Math.random() - 0.5) * 4;
-            statsGame.p1Shots++;
-        }
+    if (dx1 !== 0 || dy1 !== 0) {
+        let mag = Math.hypot(dx1, dy1);
+        player1.lastDirX = dx1 / mag;
+        player1.lastDirY = dy1 / mag;
+        player1.x += (dx1 / mag) * player1.speed;
+        player1.y += (dy1 / mag) * player1.speed;
     }
 
-    if (keys["m"] || keys["M"]) {
-        if (Math.hypot(ball.x - team2.del.x, ball.y - team2.del.y) < 30) {
-            ball.holder = null;
-            ball.vx = -12; ball.vy = (Math.random() - 0.5) * 4;
-            statsGame.p2Shots++;
-        }
-    }
+    player1.x = Math.max(player1.radius, Math.min(canvas.width - player1.radius, player1.x));
+    player1.y = Math.max(player1.radius, Math.min(canvas.height - player1.radius, player1.y));
 
-    // FÍSICAS BALÓN
-    if (ball.holder) {
-        ball.x = ball.holder.x + 12;
-        ball.y = ball.holder.y;
+    // --- CONTROLES Y MOVIMIENTO PLAYER 2 O CPU ---
+    if (p2OrCpu.isHuman) {
+        let dx2 = 0, dy2 = 0;
+        if (keys["w"] || keys["W"]) dy2 -= 1;
+        if (keys["s"] || keys["S"]) dy2 += 1;
+        if (keys["a"] || keys["A"]) dx2 -= 1;
+        if (keys["d"] || keys["D"]) dx2 += 1;
+
+        // Nitro (P2: E)
+        if (keys["e"] || keys["E"]) {
+            if (p2OrCpu.nitro > 0) {
+                p2OrCpu.speed = p2OrCpu.baseSpeed * 1.6;
+                p2OrCpu.nitro = Math.max(0, p2OrCpu.nitro - 0.8);
+            } else {
+                p2OrCpu.speed = p2OrCpu.baseSpeed;
+            }
+        } else {
+            p2OrCpu.speed = p2OrCpu.baseSpeed;
+            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
+        }
+
+        if (dx2 !== 0 || dy2 !== 0) {
+            let mag = Math.hypot(dx2, dy2);
+            p2OrCpu.lastDirX = dx2 / mag;
+            p2OrCpu.lastDirY = dy2 / mag;
+            p2OrCpu.x += (dx2 / mag) * p2OrCpu.speed;
+            p2OrCpu.y += (dy2 / mag) * p2OrCpu.speed;
+        }
     } else {
-        ball.x += ball.vx; ball.y += ball.vy;
-        ball.vx *= ball.friction; ball.vy *= ball.friction;
+        // Lógica Adaptable de la CPU según dificultad
+        const diff = difficultySelect.value;
+        let targetX = ball.x;
+        let targetY = ball.y;
+
+        if (ball.x < canvas.width / 2) {
+            targetX = canvas.width - 120;
+            targetY = ball.y * 0.7 + (canvas.height / 2) * 0.3; 
+        }
+
+        // Dificultad Normal/Difícil usan Nitro si la pelota está lejos
+        if ((diff === "normal" || diff === "difícil") && Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y) > 150 && p2OrCpu.nitro > 20) {
+            p2OrCpu.speed = p2OrCpu.baseSpeed * 1.5;
+            p2OrCpu.nitro -= 0.5;
+        } else {
+            p2OrCpu.speed = p2OrCpu.baseSpeed;
+            p2OrCpu.nitro = Math.min(100, p2OrCpu.nitro + 0.2);
+        }
+
+        p2OrCpu.x += (targetX - p2OrCpu.x) * p2OrCpu.reactionRate;
+        p2OrCpu.y += (targetY - p2OrCpu.y) * p2OrCpu.reactionRate;
+    }
+
+    p2OrCpu.x = Math.max(p2OrCpu.radius, Math.min(canvas.width - p2OrCpu.radius, p2OrCpu.x));
+    p2OrCpu.y = Math.max(p2OrCpu.radius, Math.min(canvas.height - p2OrCpu.radius, p2OrCpu.y));
+
+    // --- PELOTA PEGADA (CONTROL) ---
+    let distP1Ball = Math.hypot(ball.x - player1.x, ball.y - player1.y);
+    let distP2Ball = Math.hypot(ball.x - p2OrCpu.x, ball.y - p2OrCpu.y);
+    let pelotaPegada = false;
+
+    // P1 Control (Shift)
+    if (keys["Shift"] && distP1Ball < player1.radius + ball.radius + 15) {
+        pelotaPegada = true;
+        ball.x = player1.x + player1.lastDirX * (player1.radius + ball.radius + 2);
+        ball.y = player1.y + player1.lastDirY * (player1.radius + ball.radius + 2);
+        ball.vx = 0; ball.vy = 0;
+    }
+    
+    // P2 Control (G) o CPU Normal/Difícil
+    const cpuCanControl = (!p2OrCpu.isHuman && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
+    if ((keys["g"] || keys["G"] || cpuCanControl) && !pelotaPegada && distP2Ball < p2OrCpu.radius + ball.radius + 15) {
+        pelotaPegada = true;
+        ball.x = p2OrCpu.x + p2OrCpu.lastDirX * (p2OrCpu.radius + ball.radius + 2);
+        ball.y = p2OrCpu.y + p2OrCpu.lastDirY * (p2OrCpu.radius + ball.radius + 2);
+        ball.vx = 0; ball.vy = 0;
+    }
+
+    // --- DEFENSA / ENTRADA (P1: X | P2: R | CPU en Todas las Dificultades) ---
+    // P1 Defensa (Quitar pelota a P2)
+    if (keys["x"] || keys["X"]) {
+        if (Math.hypot(p2OrCpu.x - player1.x, p2OrCpu.y - player1.y) < player1.radius + p2OrCpu.radius + 20) {
+            let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+            ball.vx = Math.cos(angle) * 12;
+            ball.vy = Math.sin(angle) * 12;
+        }
+    }
+
+    // P2 o CPU Defensa
+    const cpuDefend = (!p2OrCpu.isHuman); // CPU usa defensa en todas las dificultades
+    if (keys["r"] || keys["R"] || cpuDefend) {
+        if (Math.hypot(player1.x - p2OrCpu.x, player1.y - p2OrCpu.y) < player1.radius + p2OrCpu.radius + 20) {
+            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
+            ball.vx = Math.cos(angle) * 12;
+            ball.vy = Math.sin(angle) * 12;
+        }
+    }
+
+    // --- FÍSICAS DEL BALÓN ---
+    if (!pelotaPegada) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        ball.vx *= ball.friction;
+        ball.vy *= ball.friction;
+
+        let spd = Math.hypot(ball.vx, ball.vy);
+        if (spd > ball.maxSpeed) {
+            ball.vx = (ball.vx / spd) * ball.maxSpeed;
+            ball.vy = (ball.vy / spd) * ball.maxSpeed;
+        }
 
         // Rebotes
-        if (ball.y <= 10 || ball.y >= canvas.height - 10) ball.vy *= -1;
-    }
-
-    // Detección Posesión / Colisiones
-    const todos = [team1.gk, team1.def, team1.med, team1.del, team2.gk, team2.def, team2.med, team2.del];
-    todos.forEach(p => {
-        if (p && Math.hypot(ball.x - p.x, ball.y - p.y) < p.radius + ball.radius) {
-            ball.holder = p;
+        if (ball.y - ball.radius <= 0) {
+            ball.y = ball.radius;
+            ball.vy = Math.abs(ball.vy) * 0.85;
+        } else if (ball.y + ball.radius >= canvas.height) {
+            ball.y = canvas.height - ball.radius;
+            ball.vy = -Math.abs(ball.vy) * 0.85;
         }
-    });
 
-    if (ball.x < 425) statsGame.p2Time++; else statsGame.p1Time++;
-
-    // GOLES
-    if (ball.x <= 10) {
-        if (ball.y > 180 && ball.y < 300) { scoreP2++; resetPosiciones(); }
-        else { ball.vx *= -1; }
+        resolverColisionEntidadBalon(player1);
+        resolverColisionEntidadBalon(p2OrCpu);
     }
-    if (ball.x >= canvas.width - 10) {
-        if (ball.y > 180 && ball.y < 300) { scoreP1++; resetPosiciones(); }
-        else { ball.vx *= -1; }
+
+    // --- DISPAROS Y POWERSHOT ---
+    // P1 Disparo (Espacio)
+    if (keys[" "] && distP1Ball < player1.radius + ball.radius + 20) {
+        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+        ball.vx = Math.cos(angle) * 10;
+        ball.vy = Math.sin(angle) * 10;
+    }
+
+    // P2 Disparo (F)
+    if (keys["f"] || keys["F"]) {
+        if (distP2Ball < p2OrCpu.radius + ball.radius + 20) {
+            let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
+            ball.vx = Math.cos(angle) * 10;
+            ball.vy = Math.sin(angle) * 10;
+        }
+    }
+
+    // P1 PowerShot (Z)
+    if ((keys["z"] || keys["Z"]) && (now - player1.lastPowerShot >= POWERSHOT_COOLDOWN) && distP1Ball < player1.radius + ball.radius + 25) {
+        let angle = Math.atan2(ball.y - player1.y, ball.x - player1.x);
+        ball.vx = Math.cos(angle) * 17.5;
+        ball.vy = Math.sin(angle) * 17.5;
+        player1.lastPowerShot = now;
+    }
+
+    // P2 PowerShot (T) o CPU Difícil
+    const cpuPowerShot = (!p2OrCpu.isHuman && difficultySelect.value === "difícil" && ball.x > canvas.width * 0.6);
+    if (((keys["t"] || keys["T"]) || cpuPowerShot) && (now - p2OrCpu.lastPowerShot >= POWERSHOT_COOLDOWN) && distP2Ball < p2OrCpu.radius + ball.radius + 25) {
+        let angle = Math.atan2(ball.y - p2OrCpu.y, ball.x - p2OrCpu.x);
+        ball.vx = Math.cos(angle) * 17.5;
+        ball.vy = Math.sin(angle) * 17.5;
+        p2OrCpu.lastPowerShot = now;
+    }
+
+    // --- GOLES ---
+    const goalTop = canvas.height / 2 - 60;
+    const goalBottom = canvas.height / 2 + 60;
+
+    if (ball.x - ball.radius <= 0) {
+        if (ball.y >= goalTop && ball.y <= goalBottom) {
+            scoreCpu++;
+            resetPosiciones();
+        } else {
+            ball.x = ball.radius;
+            ball.vx = Math.abs(ball.vx) * 0.85;
+        }
+    }
+
+    if (ball.x + ball.radius >= canvas.width) {
+        if (ball.y >= goalTop && ball.y <= goalBottom) {
+            scoreP1++;
+            resetPosiciones();
+        } else {
+            ball.x = canvas.width - ball.radius;
+            ball.vx = -Math.abs(ball.vx) * 0.85;
+        }
     }
 }
 
-function movimientoAIAvanzado(entidad, balon, minY, maxY, dir) {
-    if (!entidad) return;
-    let targetX = dir === 1 ? Math.min(balon.x - 40, maxY) : Math.max(balon.x + 40, minY);
-    let targetY = balon.y;
-    entidad.x += (targetX - entidad.x) * 0.04;
-    entidad.y += (targetY - entidad.y) * 0.04;
+function resolverColisionEntidadBalon(entidad) {
+    let dx = ball.x - entidad.x;
+    let dy = ball.y - entidad.y;
+    let distancia = Math.hypot(dx, dy);
+    let minDist = entidad.radius + ball.radius;
+
+    if (distancia < minDist) {
+        let angle = Math.atan2(dy, dx);
+        let fuerza = 5;
+        ball.vx = Math.cos(angle) * fuerza;
+        ball.vy = Math.sin(angle) * fuerza;
+        ball.x = entidad.x + Math.cos(angle) * minDist;
+        ball.y = entidad.y + Math.sin(angle) * minDist;
+    }
 }
 
 function dibujarJuego() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Campo
-    ctx.fillStyle = "#2e8b57";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, 60, 0, Math.PI * 2); ctx.stroke();
+    if (imgPitch.complete && imgPitch.naturalWidth > 0) {
+        ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = "#2e8b57";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     // Dibujar Jugadores
-    [team1.gk, team1.def, team1.med, team1.del].forEach(p => dibujarJugador(p, "#00ffff"));
-    [team2.gk, team2.def, team2.med, team2.del].forEach(p => dibujarJugador(p, "#ff0055"));
+    dibujarJugadorCanvas(player1, imgP1Badge, "#00ffff");
+    dibujarJugadorCanvas(p2OrCpu, imgCpuBadge, "#ff0055");
 
-    // Balón
+    // Dibujar Balón
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // Marcador Canvas
-    ctx.fillStyle = "#fff"; ctx.font = "bold 18px Poppins";
-    ctx.fillText(`P1: ${scoreP1} - ${scoreP2} P2`, canvas.width / 2 - 40, 30);
+    // Marcador
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px Poppins, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${player1.name} ${scoreP1} - ${scoreCpu} ${p2OrCpu.name}`, canvas.width / 2, 35);
+
+    // Indicadores de Nitro
+    ctx.fillStyle = "#00ffff";
+    ctx.fillRect(20, 20, player1.nitro * 1.2, 8);
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(20, 20, 120, 8);
+
+    ctx.fillStyle = "#ff0055";
+    ctx.fillRect(canvas.width - 140, 20, p2OrCpu.nitro * 1.2, 8);
+    ctx.strokeRect(canvas.width - 140, 20, 120, 8);
 }
 
-function dibujarJugador(p, color) {
-    if (!p) return;
+function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill(); ctx.stroke();
+    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
+    ctx.clip();
 
-    // Barra de energía
-    ctx.fillStyle = "#00ff00";
-    ctx.fillRect(p.x - 12, p.y - 22, (p.energy / 100) * 24, 4);
-    ctx.strokeStyle = "#000"; ctx.strokeRect(p.x - 12, p.y - 22, 24, 4);
+    if (imgEscudo.complete && imgEscudo.naturalWidth > 0) {
+        ctx.drawImage(imgEscudo, entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
+    } else {
+        ctx.fillStyle = colorBorde;
+        ctx.fillRect(entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
+    }
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = colorBorde;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 }
 
-function mostrarModalStats() {
-    document.getElementById("stP1Score").textContent = scoreP1;
-    document.getElementById("stP2Score").textContent = scoreP2;
+// ==============================
+// EVENTOS Y EVENT LISTENERS
+// ==============================
 
-    let totalT = statsGame.p1Time + statsGame.p2Time || 1;
-    let p1P = Math.round((statsGame.p1Time / totalT) * 100);
-    document.getElementById("p1Poss").textContent = `${p1P}%`;
-    document.getElementById("p2Poss").textContent = `${100 - p1P}%`;
+searchButton.addEventListener("click", buscarJugador);
 
-    document.getElementById("p1Shots").textContent = statsGame.p1Shots;
-    document.getElementById("p2Shots").textContent = statsGame.p2Shots;
-
-    // Determinar MVP
-    let mvp = scoreP1 >= scoreP2 ? team1.del : team2.del;
-    document.getElementById("mvpName").textContent = mvp.name;
-    document.getElementById("mvpRole").textContent = `Rol: ${mvp.role}`;
-    document.getElementById("mvpImg").src = mvp.image || './download.jpg';
-
-    document.getElementById("pauseModal").classList.add("hidden");
-    document.getElementById("statsModal").classList.remove("hidden");
-}
-
-searchButton.addEventListener("click", () => {
-    const val = searchInput.value.toLowerCase();
-    jugadoresFiltrados = todosLosJugadores.filter(p => p.name.toLowerCase().includes(val));
-    offset = 0;
-    renderizarPaginaActual();
+searchInput.addEventListener("keyup", () => {
+    buscarJugador();
 });
 
-nextBtn.addEventListener("click", () => { offset += limite; renderizarPaginaActual(); });
-previousBtn.addEventListener("click", () => { offset -= limite; renderizarPaginaActual(); });
+nextBtn.addEventListener("click", () => {
+    if (offset + limite < jugadoresFiltrados.length) {
+        offset += limite;
+        renderizarPaginaActual();
+    }
+});
 
+previousBtn.addEventListener("click", () => {
+    if (offset - limite >= 0) {
+        offset -= limite;
+        renderizarPaginaActual();
+    }
+});
+
+// INICIALIZAR
 cargarDatosAPI();
