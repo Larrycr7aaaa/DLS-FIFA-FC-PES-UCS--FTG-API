@@ -4,61 +4,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DLS 26 Special Cards DataBase</title>
+    <title>DLS 26 Special Cards - Mode 7v7 Arcade</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
 
-    <!-- PANTALLA DE CARGA -->
     <div id="loading" class="hidden">
         <div class="loader"></div>
         <p>Cargando datos...</p>
     </div>
 
-    <!-- NOTIFICACIÓN DE ERROR -->
     <div id="errorMessage" class="hidden"></div>
 
-    <!-- ENCABEZADO -->
     <header>
         <div class="logo">
             <div> 
-                <img src="logo.png" alt="Logo DLS" style="height: 50px;">
+                <img src="logo.png" alt="Logo DLS" style="height: 50px;" onerror="this.src='./images_2.png';">
                 <h1>DLS 26 SPA</h1>
-                <p>Colección Oficial de Cartas</p>
+                <p>Colección Oficial de Cartas & 7v7 Match</p>
             </div>
         </div>
 
-        <!-- MINI REPRODUCTOR DE MÚSICA -->
         <div class="music-player">
             <audio id="audioTrack" src="sound 1 dls.mp3"></audio>
             <div class="music-info">
                 <span id="trackTitle">🎵 Carga tu música</span>
             </div>
             <div class="music-controls">
-                <select id="trackSelect">
-                    <!-- Cargado dinámicamente desde el JSON -->
-                </select>
+                <select id="trackSelect"></select>
                 <button id="playPauseBtn">▶</button>
             </div>
         </div>
 
-        <!-- BUSCADOR -->
         <div class="search">
             <input type="text" id="searchInput" placeholder="Buscar jugador, equipo, país, media...">
             <button id="searchButton">Buscar</button>
         </div>
     </header>
 
-    <!-- SECCIÓN DE VIDEOJUEGO -->
     <section class="game-section">
         <div class="game-header">
-            <h2>🎮 Minijuego DLS: Fútbol Arcade</h2>
-            <p><strong>P1 (Azul):</strong> Flechas (Mover) | Espacio (Tiro) | Shift (Pegada) | Q (Nitro) | X (Defensa) | Z (PowerShot)</p>
-            <p><strong>P2 (Rojo):</strong> WASD (Mover) | F (Tiro) | G (Pegada) | E (Nitro) | R (Defensa) | T (PowerShot)</p>
+            <h2>🎮 Minijuego DLS: Partido 7v7 Realista</h2>
+            <p><strong>P1 (Azul):</strong> Flechas (Mover) | Espacio (Tiro / Saque) | Shift (Pase / Centro) | Q (Nitro) | X (Entrada) | Z (PowerShot)</p>
+            <p><strong>P2 (Rojo):</strong> WASD (Mover) | F (Tiro / Saque) | G (Pase / Centro) | E (Nitro) | R (Entrada) | T (PowerShot)</p>
             
             <div id="gameTimer" style="font-size: 1.5rem; font-weight: bold; color: #ffcc00; margin: 10px 0;">
                 ⏱️ Tiempo: 03:00
@@ -75,62 +65,58 @@
             </div>
 
             <div class="selector-group">
-                <label for="playerSelect">🎮 Jugador 1:</label>
-                <select id="playerSelect"></select>
-            </div>
-
-            <div class="selector-group" id="p2PlayerGroup" style="display: none;">
-                <label for="player2Select">🎮 Jugador 2:</label>
-                <select id="player2Select"></select>
-            </div>
-
-            <div class="selector-group">
                 <label for="p1BadgeSelect">🛡️ Escudo P1:</label>
                 <select id="p1BadgeSelect">
-                    <option value="RMA.png">Real Madrid (RMA.png)</option>
-                    <option value="MUN.png">Manchester United (MUN.png)</option>
-                    <option value="logo.png">DLS Club (logo.png)</option>
+                    <option value="images_2.png">FC Barcelona</option>
+                    <option value="BAYERN.png">Bayern Múnich</option>
+                    <option value="PSG.png">PSG</option>
+                    <option value="bodo glimt.png">Bodø/Glimt</option>
                 </select>
             </div>
 
             <div class="selector-group">
                 <label for="cpuBadgeSelect">🛡️ Escudo P2/CPU:</label>
                 <select id="cpuBadgeSelect">
-                    <option value="MUN.png">Manchester United (MUN.png)</option>
-                    <option value="RMA.png">Real Madrid (RMA.png)</option>
-                    <option value="logo.png">DLS Club (logo.png)</option>
+                    <option value="BAYERN.png">Bayern Múnich</option>
+                    <option value="images_2.png">FC Barcelona</option>
+                    <option value="PSG.png">PSG</option>
+                    <option value="bodo glimt.png">Bodø/Glimt</option>
                 </select>
             </div>
 
             <div class="selector-group" id="difficultyGroup">
                 <label for="difficultySelect">⚡ Dificultad CPU:</label>
                 <select id="difficultySelect">
-                    <option value="fácil">Fácil (Solo Defensa)</option>
-                    <option value="normal" selected>Normal (Control, Nitro, Defensa)</option>
-                    <option value="difícil">Difícil (Todas las Skills)</option>
+                    <option value="fácil">Fácil</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="difícil">Difícil</option>
                 </select>
             </div>
 
-            <button id="startGameBtn" class="btn-game">Iniciar Partido ⚽</button>
+            <button id="startGameBtn" class="btn-game">Iniciar Partido 7v7 ⚽</button>
+        </div>
+
+        <!-- SELECCIÓN DE ALINEACIÓN 7v7 -->
+        <div class="squad-selection-bar">
+            <h3>📋 Alineación Equipo P1 (7 Jugadores)</h3>
+            <div class="squad-grid" id="p1SquadSelectors">
+                <!-- Se poblarán los 7 selectors dinámicamente -->
+            </div>
         </div>
 
         <div class="canvas-container">
-            <canvas id="gameCanvas" width="800" height="450"></canvas>
+            <canvas id="gameCanvas" width="900" height="500"></canvas>
         </div>
     </section>
 
-    <!-- CONTENIDO PRINCIPAL -->
     <main>
-        <!-- SECCIÓN DE JUGADORES -->
         <section class="player-list">
             <div class="section-title">
                 <h2>Jugadores</h2>
                 <span id="playerCounter">0 Jugadores</span>
             </div>
 
-            <div id="playerContainer">
-                <!-- Se genera dinámicamente -->
-            </div>
+            <div id="playerContainer"></div>
 
             <div class="pagination">
                 <button id="previousBtn" disabled>← Anterior</button>
@@ -138,7 +124,6 @@
             </div>
         </section>
 
-        <!-- PANEL LATERAL DE DETALLES -->
         <aside class="player-detail">
             <div id="detailContainer">
                 <h2>Selecciona un jugador</h2>
@@ -147,14 +132,11 @@
         </aside>
     </main>
 
-    <!-- PIE DE PÁGINA -->
     <footer>
-        <p>Proyecto SPA utilizando API DLS 26</p>
-        <p><small>HTML • CSS • JavaScript • Fetch API</small></p>
+        <p>Proyecto SPA utilizando API DLS 26 • Formato 7v7 Realista con Balón Parado</p>
     </footer>
 
     <script src="script.js"></script>
-
 </body>
 
 </html>
