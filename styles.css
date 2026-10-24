@@ -1,5 +1,5 @@
 /* ================================= */
-/* RESET */
+/* RESET Y ESTILOS GLOBALES */
 /* ================================= */
 
 * {
@@ -19,7 +19,7 @@ body {
 }
 
 /* ================================= */
-/* HEADER & REPRODUCTOR */
+/* ENCABEZADO Y REPRODUCTOR */
 /* ================================= */
 
 header {
@@ -222,7 +222,7 @@ header {
 }
 
 /* ================================= */
-/* MAIN */
+/* CONTENIDO PRINCIPAL */
 /* ================================= */
 
 main {
@@ -231,10 +231,6 @@ main {
     gap: 25px;
     padding: 30px;
 }
-
-/* ================================= */
-/* LISTA DE JUGADORES */
-/* ================================= */
 
 .section-title {
     display: flex;
@@ -257,10 +253,6 @@ main {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 20px;
 }
-
-/* ================================= */
-/* TARJETAS */
-/* ================================= */
 
 .card {
     background: white;
@@ -296,10 +288,6 @@ main {
     font-size: .9rem;
     font-weight: 600;
 }
-
-/* ================================= */
-/* BOTONES DE TARJETA */
-/* ================================= */
 
 .card button,
 .card .btn-info {
@@ -390,7 +378,7 @@ main {
 }
 
 /* ================================= */
-/* CONTENEDORES E IMÁGENES DE JUGADOR */
+/* IMÁGENES DE JUGADORES */
 /* ================================= */
 
 .card-img-wrapper {
@@ -464,7 +452,7 @@ main {
 }
 
 /* ================================= */
-/* LOADING */
+/* CARGA Y ERROR */
 /* ================================= */
 
 #loading {
@@ -498,10 +486,6 @@ main {
     }
 }
 
-/* ================================= */
-/* ERROR */
-/* ================================= */
-
 #errorMessage {
     position: fixed;
     bottom: 25px;
@@ -514,7 +498,7 @@ main {
 }
 
 /* ================================= */
-/* FOOTER */
+/* PIE DE PÁGINA Y COLORES */
 /* ================================= */
 
 footer {
@@ -525,10 +509,6 @@ footer {
     padding: 20px;
 }
 
-/* ================================= */
-/* COLORES Y POSICIONES */
-/* ================================= */
-
 .pos-gk { background: #1e88e5; color: #ffffff; }
 .pos-del { background: #e53935; color: #ffffff; }
 .pos-def { background: #4caf50; color: #000000; }
@@ -537,7 +517,7 @@ footer {
 .dark { background: #212121; color: #ffffff; }
 
 /* ================================= */
-/* RESPONSIVE */
+/* ADAPTABILIDAD RESPONSIVA */
 /* ================================= */
 
 @media(max-width:992px) {
