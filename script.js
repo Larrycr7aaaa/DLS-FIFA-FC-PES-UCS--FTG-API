@@ -1,952 +1,300 @@
-// ===========================================
-// DLS 26 CARDS SPA & MINIJUEGO FIX GitHub Pages
-// API Local: dls26-cards.json
-// ===========================================
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const canvas = $("gameCanvas"), ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+let allPlayers = [], filteredPlayers = [], page = 0, pageSize = 8;
+let raf = 0, lastFrame = 0, running = false, paused = false, matchOver = false;
+let matchSeconds = 180, timeLeft = 180, lastSecond = 0, mode = "1P";
+let score1 = 0, score2 = 0, keys = Object.create(null), prevKeys = Object.create(null);
+let lastStatus = "Selecciona el modo y comienza el partido.";
+const audio = $("audioTrack");
+const badge1 = new Image(), badge2 = new Image();
+let pitchImage = new Image(); pitchImage.src = "FUT.jpg";
+badge1.src = $("p1BadgeSelect").value; badge2.src = $("cpuBadgeSelect").value;
 
-const URL = './dls26-cards.json';
+function posClass(pos) {
+  pos = (pos || "").toUpperCase();
+  if (["GK","POR"].includes(pos)) return "pos-gk";
+  if (["DC","SD","EI","ED","DEL"].includes(pos)) return "pos-del";
+  if (["DFC","LD","LI","DF"].includes(pos)) return "pos-def";
+  if (["MC","CAI","CAD","MCO","MCD","MED"].includes(pos)) return "pos-med";
+  return "pos-default";
+}
+function statColor(n) { return n < 60 ? "#ff6464" : n < 70 ? "#ffad55" : n < 80 ? "#f4d65e" : n < 90 ? "#7ee39b" : "#6dd5ff"; }
+function safeNumber(n, fallback=0) { n=Number(n); return Number.isFinite(n) ? n : fallback; }
 
-let todosLosJugadores = [];
-let jugadoresFiltrados = [];
-let offset = 0;
-const limite = 8;
-
-// DOM
-const playerContainer = document.getElementById("playerContainer");
-const detailContainer = document.getElementById("detailContainer");
-const previousBtn = document.getElementById("previousBtn");
-const nextBtn = document.getElementById("nextBtn");
-const searchInput = document.getElementById("searchInput");
-const searchButton = document.getElementById("searchButton");
-const loading = document.getElementById("loading");
-const errorMessage = document.getElementById("errorMessage");
-const playerCounter = document.getElementById("playerCounter");
-
-// Reproductor
-const audioTrack = document.getElementById("audioTrack");
-const playPauseBtn = document.getElementById("playPauseBtn");
-const trackSelect = document.getElementById("trackSelect");
-const trackTitle = document.getElementById("trackTitle");
-
-function inicializarReproductor(playlist) {
-    if (!playlist || playlist.length === 0) return;
-    trackSelect.innerHTML = "";
+function initCards(data) {
+  allPlayers = Array.isArray(data) ? data : (data.players || []);
+  const playlist = data && data.playlist;
+  if (Array.isArray(playlist) && playlist.length) {
+    $("trackSelect").innerHTML = '<option value="">Selecciona música (si existe)</option>';
     playlist.forEach(track => {
-        const option = document.createElement("option");
-        option.value = track.file;
-        option.textContent = track.title;
-        trackSelect.appendChild(option);
+      const o=document.createElement("option"); o.value=track.file; o.textContent=track.title; $("trackSelect").appendChild(o);
     });
-    audioTrack.src = playlist[0].file;
-    trackTitle.textContent = `🎵 ${playlist[0].title}`;
+    $("musicNote").textContent="La música requiere que sus archivos estén en la carpeta.";
+  }
+  filteredPlayers = allPlayers.slice();
+  populatePlayerSelects();
+  renderPage();
 }
-
-if (playPauseBtn) {
-    playPauseBtn.addEventListener("click", () => {
-        if (audioTrack.paused) {
-            audioTrack.play();
-            playPauseBtn.textContent = "⏸";
-        } else {
-            audioTrack.pause();
-            playPauseBtn.textContent = "▶";
-        }
-    });
+function populatePlayerSelects() {
+  ["playerSelect","player2Select"].forEach(id => {
+    const sel=$(id); sel.innerHTML="";
+    allPlayers.forEach((p,i)=>{const o=document.createElement("option");o.value=String(i);o.textContent=`${p.country?.flag||""} ${p.name} (${p.rating ?? "?"} OVR · ${p.position||"?"})`;sel.appendChild(o);});
+  });
+  if ($("player2Select").options.length > 1) $("player2Select").selectedIndex=1;
 }
-
-if (trackSelect) {
-    trackSelect.addEventListener("change", (e) => {
-        const selectedFile = e.target.value;
-        const selectedText = e.target.options[e.target.selectedIndex].text;
-        audioTrack.src = selectedFile;
-        trackTitle.textContent = `🎵 ${selectedText}`;
-        audioTrack.play();
-        playPauseBtn.textContent = "⏸";
-    });
+function renderPage() {
+  const box=$("playerContainer"); box.innerHTML="";
+  $("playerCounter").textContent=`${filteredPlayers.length} jugadores`;
+  const pages=Math.max(1,Math.ceil(filteredPlayers.length/pageSize)); page=Math.min(page,pages-1);
+  $("pageLabel").textContent=`Página ${page+1} / ${pages}`;
+  $("previousBtn").disabled=page===0; $("nextBtn").disabled=page>=pages-1;
+  const list=filteredPlayers.slice(page*pageSize,(page+1)*pageSize);
+  if (!list.length) {box.innerHTML='<p class="muted">No se encontraron jugadores.</p>';return;}
+  list.forEach(p=>{
+    const card=document.createElement("article");card.className="card";
+    const wrap=document.createElement("div");wrap.className="card-img-wrapper";
+    const img=document.createElement("img");img.className="player-img";img.alt=p.name||"Jugador";img.loading="lazy";img.src=p.image||"";
+    img.onerror=()=>{img.onerror=null;img.style.opacity="0";wrap.textContent="⚽";wrap.style.fontSize="3rem";};wrap.appendChild(img);
+    const body=document.createElement("div");body.className="card-body";
+    const id=document.createElement("span");id.className="id";id.textContent=`#${p.year||""} · ${p.country?.flag||""}`;
+    const name=document.createElement("h3");name.textContent=p.name||"Jugador";
+    const team=document.createElement("p");team.textContent=p.team||"Equipo no indicado";
+    const badges=document.createElement("div");
+    const position=document.createElement("span");position.className=`tipo ${posClass(p.position)}`;position.textContent=p.position||"N/A";
+    const rating=document.createElement("span");rating.className="tipo dark";rating.textContent=`${p.rating??"?"} OVR`;
+    const btn=document.createElement("button");btn.className="btn-info";btn.textContent="Ver información";btn.addEventListener("click",()=>showDetails(p));
+    badges.append(position,rating);body.append(id,name,team,badges,btn);card.append(wrap,body);box.appendChild(card);
+  });
 }
-
-function obtenerClasePosicion(posicion) {
-    if (!posicion) return "pos-default";
-    const pos = posicion.toUpperCase();
-    if (["GK", "POR"].includes(pos)) return "pos-gk";
-    if (["DC", "SD", "EI", "ED"].includes(pos)) return "pos-del";
-    if (["DFC", "LD", "LI"].includes(pos)) return "pos-def";
-    if (["MC", "CAI", "CAD", "MCO", "MCD"].includes(pos)) return "pos-med";
-    return "pos-default";
+function showDetails(p) {
+  const detail=$("detailContainer");detail.innerHTML="";
+  const wrap=document.createElement("div");wrap.className="detail-img-wrapper";
+  const img=document.createElement("img");img.className="detail-player-img";img.alt=p.name||"Jugador";img.src=p.image||"";img.onerror=()=>{img.style.opacity="0";wrap.textContent="⚽";wrap.style.fontSize="3rem";};wrap.appendChild(img);
+  const h=document.createElement("h2");h.textContent=`${p.name||"Jugador"} ${p.country?.flag||""}`;
+  const intro=document.createElement("p");intro.innerHTML="";intro.textContent=`${p.position||"N/A"} · ${p.rating??"?"} OVR · ${p.team||"Equipo desconocido"}`;
+  detail.append(wrap,h,intro);
+  const rows=[];
+  if(p.stats?.physical) rows.push(["Velocidad",p.stats.physical.speed],["Aceleración",p.stats.physical.acceleration],["Resistencia",p.stats.physical.stamina],["Fuerza",p.stats.physical.strength]);
+  if(p.stats?.technical) rows.push(["Control",p.stats.technical.control],["Pases",p.stats.technical.passing],["Tiro",p.stats.technical.shooting],["Entrada",p.stats.technical.tackling]);
+  if(p.stats?.goalkeeping) rows.push(["Reflejos",p.stats.goalkeeping.reflexes],["Paradas",p.stats.goalkeeping.handling]);
+  if(rows.length){const section=document.createElement("div");section.className="stats";const title=document.createElement("h3");title.textContent="Atributos";section.appendChild(title);
+    rows.forEach(([label,val])=>{if(val===undefined)return;const n=Math.max(0,Math.min(100,safeNumber(val)));const stat=document.createElement("div");stat.className="stat";const head=document.createElement("div");head.className="stat-header";const a=document.createElement("span");a.textContent=label;const b=document.createElement("span");b.textContent=String(val);b.style.color=statColor(n);head.append(a,b);const bar=document.createElement("div");bar.className="progress";const fill=document.createElement("span");fill.style.width=n+"%";fill.style.background=statColor(n);bar.appendChild(fill);stat.append(head,bar);section.appendChild(stat);});detail.appendChild(section);}
+  const more=document.createElement("p");more.textContent=`País: ${p.country?.name||"N/A"} · Tipo: ${p.cardType||"Estándar"} · Pie: ${p.preferredFoot||"N/A"}${p.heightCm?` · Altura: ${p.heightCm} cm`:""}`;detail.appendChild(more);
 }
+function searchPlayers(){const q=$("searchInput").value.trim().toLocaleLowerCase();filteredPlayers=allPlayers.filter(p=>[p.name,p.team,p.country?.name,p.position,p.cardType,p.rating].some(v=>String(v??"").toLocaleLowerCase().includes(q)));page=0;renderPage();}
+$("searchButton").addEventListener("click",searchPlayers);$("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")searchPlayers();});$("searchInput").addEventListener("input",searchPlayers);
+$("previousBtn").addEventListener("click",()=>{page=Math.max(0,page-1);renderPage();});$("nextBtn").addEventListener("click",()=>{page++;renderPage();});
+$("playPauseBtn").addEventListener("click",async()=>{if(!audio.src){setStatus("Añade los MP3 de la lista a la carpeta del proyecto para escuchar música.");return;}try{if(audio.paused){await audio.play();$("playPauseBtn").textContent="Ⅱ";}else{audio.pause();$("playPauseBtn").textContent="▶";}}catch{setStatus("El archivo de música no está disponible. El juego funciona sin música.");}});
+$("trackSelect").addEventListener("change",async()=>{if(!$("trackSelect").value)return;audio.src=$("trackSelect").value;try{await audio.play();$("playPauseBtn").textContent="Ⅱ";$("trackTitle").textContent="🎵 "+$("trackSelect").selectedOptions[0].textContent;}catch{$("trackTitle").textContent="🎵 Archivo no encontrado";}});
+audio.addEventListener("ended",()=>{$("playPauseBtn").textContent="▶";});
 
-function obtenerColorStat(valor) {
-    if (valor === 0) return "#ff66cc";
-    if (valor < 60) return "#ff3333";
-    if (valor < 70) return "#ff9900";
-    if (valor < 80) return "#ffd700";
-    if (valor < 90) return "#2ecc71";
-    return "#00bfff";
+const makePlayer=(x,y,team)=>({x,y,vx:0,vy:0,r:17,team,dirX:team===1?1:-1,dirY:0,stamina:100,kickLock:0,tackle:0,stun:0});
+let p1=makePlayer(270,H/2,1), p2=makePlayer(W-270,H/2,2);
+let ball={x:W/2,y:H/2,vx:0,vy:0,r:8,owner:null,lastTouch:0};
+const goal={top:H/2-82,bottom:H/2+82,depth:22};
+let aiThink=0, aiTarget={x:W-200,y:H/2}, kickoffTicks=0;
+const DIFF={facil:{speed:2.45,reaction:.22,accuracy:.65,press:0.48},media:{speed:3.05,reaction:.12,accuracy:.82,press:.7},dificil:{speed:3.65,reaction:.045,accuracy:.96,press:.95}};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const norm=(x,y)=>{const l=Math.hypot(x,y)||1;return{x:x/l,y:y/l};};
+function setStatus(s){lastStatus=s;$("gameStatus").textContent=s;}
+function drawField(){
+  ctx.clearRect(0,0,W,H);
+  for(let i=0;i<10;i++){ctx.fillStyle=i%2?"#207c36":"#26863b";ctx.fillRect(i*W/10,0,W/10,H);}
+  ctx.strokeStyle="#e6f4e4";ctx.lineWidth=3;ctx.strokeRect(25,24,W-50,H-48);
+  ctx.beginPath();ctx.moveTo(W/2,24);ctx.lineTo(W/2,H-24);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,72,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,4,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();
+  ctx.strokeRect(25,H/2-130,145,260);ctx.strokeRect(25,H/2-70,58,140);
+  ctx.strokeRect(W-170,H/2-130,145,260);ctx.strokeRect(W-83,H/2-70,58,140);
+  ctx.beginPath();ctx.arc(115,H/2,3,0,Math.PI*2);ctx.arc(W-115,H/2,3,0,Math.PI*2);ctx.fill();
+  ctx.strokeRect(3,H/2-48,24,96);ctx.strokeRect(W-27,H/2-48,24,96);
+  ctx.strokeStyle="#ffffff88";ctx.lineWidth=2;ctx.beginPath();ctx.arc(115,H/2,50,-.95,.95);ctx.stroke();ctx.beginPath();ctx.arc(W-115,H/2,50,Math.PI-.95,Math.PI+.95);ctx.stroke();
 }
-
-function mostrarLoading() { if (loading) loading.classList.remove("hidden"); }
-function ocultarLoading() { if (loading) loading.classList.add("hidden"); }
-function mostrarError(texto = "Error de procesamiento.") {
-    if (errorMessage) {
-        errorMessage.textContent = texto;
-        errorMessage.classList.remove("hidden");
-        setTimeout(() => { errorMessage.classList.add("hidden"); }, 2500);
-    }
+function drawPlayer(p,badge,label){
+  ctx.save();
+  ctx.shadowColor="#001c0a99";ctx.shadowBlur=10;ctx.shadowOffsetY=4;
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=p.team===1?"#218bff":"#f04452";ctx.fill();
+  ctx.lineWidth=3;ctx.strokeStyle="#fff";ctx.stroke();ctx.shadowColor="transparent";ctx.shadowOffsetY=0;
+  ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+p.dirX*15,p.y+p.dirY*15);ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.stroke();
+  if(badge?.complete&&badge.naturalWidth>0){ctx.beginPath();ctx.arc(p.x,p.y-p.r-12,10,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.save();ctx.beginPath();ctx.arc(p.x,p.y-p.r-12,9,0,Math.PI*2);ctx.clip();ctx.drawImage(badge,p.x-9,p.y-p.r-21,18,18);ctx.restore();}
+  ctx.fillStyle="#fff";ctx.font="bold 11px Poppins, sans-serif";ctx.textAlign="center";ctx.shadowColor="#001";ctx.shadowBlur=3;ctx.fillText(label,p.x,p.y+p.r+15);
+  if(p.stamina<99){ctx.shadowBlur=0;ctx.fillStyle="#082215";ctx.fillRect(p.x-17,p.y+p.r+20,34,4);ctx.fillStyle="#b8f6ca";ctx.fillRect(p.x-17,p.y+p.r+20,34*p.stamina/100,4);}
+  ctx.restore();
 }
-
-async function cargarDatosAPI() {
-    mostrarLoading();
-    try {
-        const respuesta = await fetch(URL);
-        if (!respuesta.ok) throw new Error("No se pudo cargar la API");
-        const data = await respuesta.json();
-
-        if (data.playlist) {
-            inicializarReproductor(data.playlist);
-            todosLosJugadores = data.players || [];
-        } else {
-            todosLosJugadores = Array.isArray(data) ? data : [];
-        }
-
-        jugadoresFiltrados = [...todosLosJugadores];
-        pobladorSelectorJugadores();
-        renderizarPaginaActual();
-        inicializarJuegoCanvas();
-    } catch (error) {
-        mostrarError("Error cargando la base de datos.");
-    }
-    ocultarLoading();
+function drawBall(){ctx.save();ctx.shadowColor="#001";ctx.shadowBlur=8;ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle="#27372d";ctx.lineWidth=1.4;ctx.stroke();ctx.beginPath();ctx.arc(ball.x,ball.y,3,0,Math.PI*2);ctx.fillStyle="#17251b";ctx.fill();ctx.restore();}
+function drawGame(){
+  drawField();
+  // Goal nets
+  ctx.fillStyle="#dce9dc33";ctx.fillRect(2,goal.top,23,goal.bottom-goal.top);ctx.fillRect(W-25,goal.top,23,goal.bottom-goal.top);
+  drawPlayer(p1,badge1,$("scoreName1").textContent);drawPlayer(p2,badge2,$("scoreName2").textContent);
+  drawBall();
+  if(!running){ctx.fillStyle="#fff9";ctx.font="bold 16px Poppins";ctx.textAlign="center";ctx.fillText("PULSA INICIAR PARTIDO",W/2,H-38);}
 }
-
-function renderizarPaginaActual() {
-    if (!playerContainer) return;
-    playerContainer.innerHTML = "";
-    if (playerCounter) playerCounter.textContent = `${jugadoresFiltrados.length} Jugadores`;
-
-    if (jugadoresFiltrados.length === 0) {
-        playerContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">No se encontraron resultados.</p>`;
-        return;
-    }
-
-    const corte = jugadoresFiltrados.slice(offset, offset + limite);
-    corte.forEach(jugador => crearCard(jugador));
-
-    if (previousBtn) previousBtn.disabled = offset === 0;
-    if (nextBtn) nextBtn.disabled = offset + limite >= jugadoresFiltrados.length;
+function nearest(p){return Math.hypot(ball.x-p.x,ball.y-p.y);}
+function getMovement(p, up, down, left, right, sprint){
+  let dx=(keys[right]?1:0)-(keys[left]?1:0),dy=(keys[down]?1:0)-(keys[up]?1:0);
+  const d=norm(dx,dy);if(dx||dy){p.dirX=d.x;p.dirY=d.y;}
+  const boost=keys[sprint]&&p.stamina>1?1.38:1;
+  if(boost>1)p.stamina=Math.max(0,p.stamina-.65);else p.stamina=Math.min(100,p.stamina+.18);
+  return {x:d.x,y:d.y,speed:(3.0+(getRating(p.team)/100)*1.3)*boost};
 }
-
-function crearCard(player) {
-    const card = document.createElement("article");
-    card.classList.add("card");
-    const clasePosicion = obtenerClasePosicion(player.position);
-    const bandera = player.country?.flag ? player.country.flag : '';
-
-    card.innerHTML = `
-        <div class="card-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" class="player-img" onerror="this.onerror=null; this.src='./download.jpg';">
-        </div>
-        <div class="card-body">
-            <span class="id">#${player.year || ''} • ${bandera}</span>
-            <h3>${player.name}</h3>
-            <p><strong>${player.team}</strong></p>
-            <span class="tipo ${clasePosicion}">${player.position}</span>
-            <span class="tipo dark">${player.rating} OVR</span>
-            <button class="btn-info">Ver Información</button>
-        </div>
-    `;
-
-    card.querySelector(".btn-info").addEventListener("click", () => { mostrarDetalle(player); });
-    playerContainer.appendChild(card);
+function getRating(team){const idx=team===1?Number($("playerSelect").value):Number($("player2Select").value);return clamp(safeNumber(allPlayers[idx]?.rating,80),40,100);}
+function moveHuman(p,controls,dt){
+  const m=getMovement(p,...controls);p.vx=m.x*m.speed;p.vy=m.y*m.speed;
+  p.x=clamp(p.x+p.vx*dt,42,W-42);p.y=clamp(p.y+p.vy*dt,42,H-42);
 }
-
-function mostrarDetalle(player) {
-    if (!detailContainer) return;
-    const posUpper = player.position ? player.position.toUpperCase() : "";
-    const esPortero = posUpper === "GK" || posUpper === "POR";
-    const clasePosicion = obtenerClasePosicion(player.position);
-    let statsHTML = "";
-
-    if (player.stats) {
-        if (player.stats.physical) {
-            statsHTML += renderBarraStat("Velocidad", player.stats.physical.speed);
-            statsHTML += renderBarraStat("Aceleración", player.stats.physical.acceleration);
-            if (!esPortero) statsHTML += renderBarraStat("Resistencia", player.stats.physical.stamina);
-            statsHTML += renderBarraStat("Fuerza", player.stats.physical.strength);
-        }
-        if (player.stats.technical) {
-            statsHTML += renderBarraStat("Control", player.stats.technical.control);
-            statsHTML += renderBarraStat("Pases", player.stats.technical.passing);
-            if (!esPortero) statsHTML += renderBarraStat("Tiro", player.stats.technical.shooting);
-            statsHTML += renderBarraStat("Entrada", player.stats.technical.tackling);
-        }
-        if (esPortero && player.stats.goalkeeping) {
-            statsHTML += renderBarraStat("Reflejos", player.stats.goalkeeping.reflexes);
-            statsHTML += renderBarraStat("Paradas", player.stats.goalkeeping.handling);
-        }
+function cpuMove(dt){
+  const d=DIFF[$("difficultySelect").value]||DIFF.media;
+  aiThink-=dt;
+  if(aiThink<=0){
+    aiThink=d.reaction*60;
+    const ownDist=nearest(p2);
+    if(ball.owner===2 || ownDist<85){
+      // Carry toward the left goal, occasionally change lane to avoid a direct route.
+      aiTarget={x:clamp(ball.x-100,120,W-125),y:clamp(ball.y+(Math.random()-.5)*95,70,H-70)};
+    }else if(ball.owner===1){
+      aiTarget={x:ball.x+28,y:ball.y};
+    }else{
+      aiTarget={x:ball.x+8,y:ball.y};
     }
-
-    detailContainer.innerHTML = `
-        <div class="detail-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" class="detail-player-img" onerror="this.src='./download.jpg'">
-        </div>
-        <h2>${player.name} ${player.country ? player.country.flag : ''}</h2>
-        <p><strong>Posición:</strong> <span class="tipo ${clasePosicion}">${player.position}</span> | <strong>Media:</strong> ${player.rating}</p>
-        <p><strong>Equipo:</strong> ${player.team}</p>
-        <p><strong>País:</strong> ${player.country ? `${player.country.name}${player.country.flag}` : 'N/A'}</p>
-        <p><strong>Tipo de carta:</strong> ${player.cardType || 'Estándar'} (${player.year || ''})</p>
-        <p><strong>Pie preferido:</strong> ${player.preferredFoot || 'N/A'} ${player.heightCm ? `| <strong>Altura:</strong> ${player.heightCm} cm` : ''}</p>
-        <div class="stats">
-            <h3>Atributos</h3>
-            ${statsHTML}
-        </div>
-    `;
+  }
+  const dir=norm(aiTarget.x-p2.x,aiTarget.y-p2.y), speed=d.speed+(getRating(2)-80)*.012;
+  p2.dirX=dir.x;p2.dirY=dir.y;p2.vx=dir.x*speed;p2.vy=dir.y*speed;
+  p2.x=clamp(p2.x+p2.vx*dt,42,W-42);p2.y=clamp(p2.y+p2.vy*dt,42,H-42);
+  if(nearest(p2)<p2.r+ball.r+9 && ball.owner!==2){
+    if(Math.random()<d.press*dt*2.2) ball.owner=2;
+  }
+  if(ball.owner===2){
+    const distGoal=Math.hypot(ball.x-50,ball.y-H/2);
+    if(distGoal<320 && Math.random()<d.accuracy*dt*.65) shoot(p2, true);
+    else if(nearest(p2)<p2.r+ball.r+10 && Math.random()<dt*1.8) passBall(p2,true);
+  }
+  if(ball.owner===1 && nearest(p2)<48 && Math.random()<d.press*dt*1.6) tackle(p2);
 }
-
-function renderBarraStat(label, valor) {
-    if (valor === undefined) return '';
-    const color = obtenerColorStat(valor);
-    return `
-        <div class="stat">
-            <div class="stat-header">
-                <span>${label}</span>
-                <span style="color: ${color};">${valor}</span>
-            </div>
-            <div class="progress">
-                <span style="width: ${Math.min(valor, 100)}%; background-color: ${color};"></span>
-            </div>
-        </div>
-    `;
+function moveBall(dt){
+  if(ball.owner){
+    const p=ball.owner===1?p1:p2;
+    ball.x=p.x+p.dirX*(p.r+ball.r+2);ball.y=p.y+p.dirY*(p.r+ball.r+2);
+    ball.vx=p.vx*.7;ball.vy=p.vy*.7;
+  }else{
+    ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+    const drag=Math.pow(.986,dt);ball.vx*=drag;ball.vy*=drag;
+    if(Math.hypot(ball.vx,ball.vy)<.14){ball.vx=0;ball.vy=0;}
+  }
+  if(ball.y<34){ball.y=34;ball.vy=Math.abs(ball.vy)*.72;}
+  if(ball.y>H-34){ball.y=H-34;ball.vy=-Math.abs(ball.vy)*.72;}
+  // Side boundaries only open inside the goal mouth.
+  if(ball.x<28 && !(ball.y>goal.top&&ball.y<goal.bottom)){ball.x=28;ball.vx=Math.abs(ball.vx)*.72;}
+  if(ball.x>W-28 && !(ball.y>goal.top&&ball.y<goal.bottom)){ball.x=W-28;ball.vx=-Math.abs(ball.vx)*.72;}
+  if(ball.x<12 && ball.y>goal.top&&ball.y<goal.bottom){goalScored(2);return;}
+  if(ball.x>W-12 && ball.y>goal.top&&ball.y<goal.bottom){goalScored(1);return;}
+  if(!ball.owner){
+    for(const p of [p1,p2]){
+      if(Math.hypot(ball.x-p.x,ball.y-p.y)<p.r+ball.r+2){ball.owner=p.team;ball.lastTouch=p.team;setStatus((p.team===1?$("scoreName1").textContent:$("scoreName2").textContent)+" controla el balón.");break;}
+    }
+  }
 }
-
-function buscarJugador() {
-    if (!searchInput) return;
-    const busqueda = searchInput.value.trim().toLowerCase();
-    jugadoresFiltrados = todosLosJugadores.filter(p =>
-        p.name?.toLowerCase().includes(busqueda) ||
-        p.team?.toLowerCase().includes(busqueda) ||
-        (p.country && p.country.name?.toLowerCase().includes(busqueda)) ||
-        p.position?.toLowerCase().includes(busqueda) ||
-        (p.cardType && p.cardType.toLowerCase().includes(busqueda)) ||
-        (p.rating !== undefined && String(p.rating).includes(busqueda))
-    );
-    offset = 0;
-    renderizarPaginaActual();
+function shoot(p,power=false){
+  if(!running||paused||matchOver)return;
+  if(ball.owner!==p.team && nearest(p)>p.r+ball.r+16)return;
+  const direction=norm(p.dirX|| (p.team===1?1:-1),p.dirY||0);
+  ball.owner=null;ball.lastTouch=p.team;
+  const rating=getRating(p.team), speed=(power?14:10)+(rating/100)*2.5;
+  ball.vx=direction.x*speed;ball.vy=direction.y*speed;
+  p.kickLock=18;
+  setStatus(power?"¡Tiro potente!":"¡Disparo!");
 }
-
-// ===========================================
-// LÓGICA Y MOTOR DEL MINIJUEGO AVANZADO
-// ===========================================
-
-const gameModeSelect = document.getElementById("gameModeSelect");
-const playerSelect = document.getElementById("playerSelect");
-const player2Select = document.getElementById("player2Select");
-const p2PlayerGroup = document.getElementById("p2PlayerGroup");
-const difficultyGroup = document.getElementById("difficultyGroup");
-const p1BadgeSelect = document.getElementById("p1BadgeSelect");
-const cpuBadgeSelect = document.getElementById("cpuBadgeSelect");
-const difficultySelect = document.getElementById("difficultySelect");
-const startGameBtn = document.getElementById("startGameBtn");
-const gameTimerElement = document.getElementById("gameTimer");
-const pauseGameBtn = document.getElementById("pauseGameBtn");
-
-// Modales y Overlays
-const pauseMenuOverlay = document.getElementById("pauseMenuOverlay");
-const halfTimeNotice = document.getElementById("halfTimeNotice");
-const resumeBtn = document.getElementById("resumeBtn");
-const forfeitBtn = document.getElementById("forfeitBtn");
-const substitutionsBtn = document.getElementById("substitutionsBtn");
-const substitutionsModal = document.getElementById("substitutionsModal");
-const subTargetSelect = document.getElementById("subTargetSelect");
-const replacementSelect = document.getElementById("replacementSelect");
-const confirmSubBtn = document.getElementById("confirmSubBtn");
-const closeSubBtn = document.getElementById("closeSubBtn");
-const finalSummaryOverlay = document.getElementById("finalSummaryOverlay");
-const closeSummaryBtn = document.getElementById("closeSummaryBtn");
-
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas ? canvas.getContext("2d") : null;
-
-let gameLoopId = null;
-let timerInterval = null;
-let matchTime = 180;
-let isPaused = false;
-let isHalfTimePaused = false;
-let halfTimeTimer = null;
-let hasPromptedSubP1 = false;
-let hasPromptedSubP2 = false;
-
-let imgP1Badge = new Image();
-let imgCpuBadge = new Image();
-let imgPitch = new Image();
-imgPitch.src = './FUT.jpg';
-
-let keys = {};
-let scoreP1 = 0;
-let scoreCpu = 0;
-const POWERSHOT_COOLDOWN = 20000;
-
-let team1 = {
-    main: { x: 180, y: 225, radius: 20, baseSpeed: 4, speed: 4, name: "Jugador 1", rating: 85, lastDirX: 1, lastDirY: 0, nitro: 100, hp: 100, stunnedUntil: 0, lastPowerShot: 0, goals: 0 },
-    defender: { x: 110, y: 225, radius: 18, speed: 3.2, name: "Defensa P1" },
-    gk: { x: 30, y: 225, radius: 22, speed: 2.8, name: "Portero P1" }
-};
-
-let team2 = {
-    main: { x: 620, y: 225, radius: 20, baseSpeed: 3.5, speed: 3.5, name: "CPU Bot", rating: 85, lastDirX: -1, lastDirY: 0, nitro: 100, hp: 100, stunnedUntil: 0, lastPowerShot: 0, reactionRate: 0.05, isHuman: false, goals: 0 },
-    defender: { x: 690, y: 225, radius: 18, speed: 3.2, name: "Defensa P2" },
-    gk: { x: 770, y: 225, radius: 22, speed: 2.8, name: "Portero P2" }
-};
-
-let ball = {
-    x: 400,
-    y: 225,
-    radius: 10,
-    vx: 0,
-    vy: 0,
-    friction: 0.94,
-    maxSpeed: 18
-};
-
-function pobladorSelectorJugadores() {
-    if (!playerSelect) return;
-    playerSelect.innerHTML = "";
-    if (player2Select) player2Select.innerHTML = "";
-    if (replacementSelect) replacementSelect.innerHTML = "";
-    
-    todosLosJugadores.forEach((p, index) => {
-        const option = document.createElement("option");
-        option.value = index;
-        const nacion = p.country?.flag ? p.country.flag : '';
-        option.textContent = `${nacion} ${p.name} (${p.rating} OVR - ${p.position})`;
-        
-        playerSelect.appendChild(option);
-        if (player2Select) player2Select.appendChild(option.cloneNode(true));
-        if (replacementSelect) replacementSelect.appendChild(option.cloneNode(true));
-    });
-
-    if (player2Select && player2Select.options.length > 1) {
-        player2Select.selectedIndex = 1;
-    }
+function passBall(p,cpu=false){
+  if(!running||paused||matchOver)return;
+  if(ball.owner!==p.team && nearest(p)>p.r+ball.r+14)return;
+  const target=cpu?{x:W/2-70,y:H/2+(Math.random()-.5)*140}: {x:p.x+p.dirX*230,y:p.y+p.dirY*230};
+  const d=norm(target.x-p.x,target.y-p.y);ball.owner=null;ball.lastTouch=p.team;ball.vx=d.x*7.6;ball.vy=d.y*7.6;p.kickLock=12;setStatus("Pase en juego.");
 }
-
-function inicializarJuegoCanvas() {
-    window.addEventListener("keydown", e => { keys[e.key] = true; });
-    window.addEventListener("keyup", e => { keys[e.key] = false; });
-
-    if (gameModeSelect) {
-        gameModeSelect.addEventListener("change", () => {
-            if (gameModeSelect.value === "2P") {
-                if (p2PlayerGroup) p2PlayerGroup.style.display = "flex";
-                if (difficultyGroup) difficultyGroup.style.display = "none";
-            } else {
-                if (p2PlayerGroup) p2PlayerGroup.style.display = "none";
-                if (difficultyGroup) difficultyGroup.style.display = "flex";
-            }
-        });
-    }
-
-    if (startGameBtn) startGameBtn.addEventListener("click", reiniciarPartido);
-    if (pauseGameBtn) pauseGameBtn.addEventListener("click", abrirPausa);
-    if (resumeBtn) resumeBtn.addEventListener("click", cerrarPausa);
-    if (forfeitBtn) forfeitBtn.addEventListener("click", rendirsePartido);
-    
-    if (substitutionsBtn) {
-        substitutionsBtn.addEventListener("click", () => {
-            if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
-            if (substitutionsModal) substitutionsModal.classList.remove("hidden");
-        });
-    }
-    
-    if (closeSubBtn) {
-        closeSubBtn.addEventListener("click", () => {
-            if (substitutionsModal) substitutionsModal.classList.add("hidden");
-            if (isPaused && pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
-        });
-    }
-
-    if (confirmSubBtn) confirmSubBtn.addEventListener("click", ejecutarSustitucion);
-    if (closeSummaryBtn) {
-        closeSummaryBtn.addEventListener("click", () => {
-            if (finalSummaryOverlay) finalSummaryOverlay.classList.add("hidden");
-        });
-    }
+function tackle(p){
+  if(!running||paused||matchOver)return;
+  p.tackle=16;
+  const opponent=p.team===1?p2:p1, dist=Math.hypot(opponent.x-p.x,opponent.y-p.y);
+  if(dist< p.r+opponent.r+19 && ball.owner===opponent.team){ball.owner=p.team;ball.vx=0;ball.vy=0;setStatus("¡Entrada limpia! Recuperaste el balón.");}
+  else if(!ball.owner && nearest(p)<p.r+ball.r+20){ball.vx=p.dirX*5.5;ball.vy=p.dirY*5.5;ball.lastTouch=p.team;setStatus("Despeje defensivo.");}
 }
-
-function reiniciarPartido() {
-    const p1Idx = playerSelect ? playerSelect.value : 0;
-    const p1Data = todosLosJugadores[p1Idx] || { name: "Jugador 1", rating: 85 };
-    team1.main.name = p1Data.name;
-    team1.main.rating = p1Data.rating;
-    team1.main.baseSpeed = 3.5 + (team1.main.rating / 100) * 2.2;
-    team1.main.nitro = 100;
-    team1.main.hp = 100;
-    team1.main.stunnedUntil = 0;
-    team1.main.lastPowerShot = 0;
-    team1.main.goals = 0;
-
-    if (p1BadgeSelect) imgP1Badge.src = encodeURI(p1BadgeSelect.value);
-    if (cpuBadgeSelect) imgCpuBadge.src = encodeURI(cpuBadgeSelect.value);
-
-    if (gameModeSelect && gameModeSelect.value === "2P") {
-        team2.main.isHuman = true;
-        const p2Idx = player2Select ? player2Select.value : 1;
-        const p2Data = todosLosJugadores[p2Idx] || { name: "Jugador 2", rating: 85 };
-        team2.main.name = p2Data.name;
-        team2.main.rating = p2Data.rating;
-        team2.main.baseSpeed = 3.5 + (team2.main.rating / 100) * 2.2;
-    } else {
-        team2.main.isHuman = false;
-        team2.main.name = "CPU Bot";
-        const diff = difficultySelect ? difficultySelect.value : "normal";
-        if (diff === "fácil") {
-            team2.main.baseSpeed = 2.8;
-            team2.main.reactionRate = 0.04;
-        } else if (diff === "normal") {
-            team2.main.baseSpeed = 3.8;
-            team2.main.reactionRate = 0.07;
-        } else {
-            team2.main.baseSpeed = 4.8;
-            team2.main.reactionRate = 0.11;
-        }
-    }
-    team2.main.nitro = 100;
-    team2.main.hp = 100;
-    team2.main.stunnedUntil = 0;
-    team2.main.lastPowerShot = 0;
-    team2.main.goals = 0;
-
-    resetPosiciones();
-    scoreP1 = 0;
-    scoreCpu = 0;
-    isPaused = false;
-    isHalfTimePaused = false;
-    hasPromptedSubP1 = false;
-    hasPromptedSubP2 = false;
-    
-    if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
-    if (substitutionsModal) substitutionsModal.classList.add("hidden");
-    if (finalSummaryOverlay) finalSummaryOverlay.classList.add("hidden");
-
-    iniciarTemporizador();
-
-    if (gameLoopId) cancelAnimationFrame(gameLoopId);
-    bucleJuego();
+function goalScored(team){
+  if(matchOver)return;
+  if(team===1)score1++;else score2++;
+  updateScore();setStatus("⚽ ¡GOOOL de "+(team===1?$("scoreName1").textContent:$("scoreName2").textContent)+"!");
+  $("gameOverlay").classList.remove("hidden");
+  $("gameOverlay").innerHTML=`<div class="overlay-card"><div class="overlay-ball">⚽</div><h3>¡GOOOOL!</h3><p>${$("scoreName1").textContent} ${score1} — ${score2} ${$("scoreName2").textContent}</p><p class="overlay-small">El partido continúa en un instante…</p></div>`;
+  resetPositions();kickoffTicks=55;
 }
-
-function iniciarTemporizador() {
-    clearInterval(timerInterval);
-    matchTime = 180;
-
-    timerInterval = setInterval(() => {
-        if (isPaused) return;
-
-        matchTime--;
-
-        let m = Math.floor(matchTime / 60);
-        let s = matchTime % 60;
-        let str = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-
-        if (gameTimerElement) gameTimerElement.textContent = str;
-
-        if (matchTime === 89 && !isHalfTimePaused) {
-            pausaMedioTiempo();
-        }
-
-        if (matchTime <= 0) {
-            clearInterval(timerInterval);
-            cancelAnimationFrame(gameLoopId);
-            mostrarResumenFinal();
-        }
-    }, 1000);
+function updateScore(){$("scoreP1").textContent=score1;$("scoreP2").textContent=score2;}
+function resetPositions(){p1.x=270;p1.y=H/2;p1.vx=p1.vy=0;p1.dirX=1;p1.dirY=0;p2.x=W-270;p2.y=H/2;p2.vx=p2.vy=0;p2.dirX=-1;p2.dirY=0;ball.x=W/2;ball.y=H/2;ball.vx=ball.vy=0;ball.owner=null;aiThink=0;}
+function endMatch(){running=false;matchOver=true;paused=false;$("pauseGameBtn").disabled=true;$("pauseGameBtn").textContent="Ⅱ Pausar";$("gameOverlay").classList.remove("hidden");const draw=score1===score2;const winner=score1>score2?$("scoreName1").textContent:$("scoreName2").textContent;$("gameOverlay").innerHTML=`<div class="overlay-card"><div class="overlay-ball">${draw?"🤝":"🏆"}</div><h3>${draw?"¡Empate!":"¡Final del partido!"}</h3><p>${$("scoreName1").textContent} ${score1} — ${score2} ${$("scoreName2").textContent}</p><p>${draw?"Buen partido para ambos equipos.":"Ganador: "+winner}</p><p class="overlay-small">Pulsa Iniciar partido para jugar otra vez.</p></div>`;setStatus("Partido finalizado.");drawGame();}
+function updateTimer(now){if(now-lastSecond>=1000){lastSecond=now;timeLeft=Math.max(0,timeLeft-1);const m=Math.floor(timeLeft/60),s=timeLeft%60;$("gameTimer").textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;if(timeLeft<=0)endMatch();}}
+function justPressed(k){return !!keys[k]&&!prevKeys[k];}
+function update(dt,now){
+  if(!running||paused||matchOver)return;
+  if(kickoffTicks>0){kickoffTicks--;if(kickoffTicks===0)$("gameOverlay").classList.add("hidden");}
+  moveHuman(p1,["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","q"],dt);
+  if(mode==="2P")moveHuman(p2,["w","s","a","d","e"],dt);else cpuMove(dt);
+  if(justPressed(" ")||justPressed("Space"))shoot(p1,false);
+  if(justPressed("Shift"))passBall(p1);
+  if(justPressed("z"))shoot(p1,true);
+  if(justPressed("x"))tackle(p1);
+  if(mode==="2P"){
+    if(justPressed("f"))shoot(p2,false);
+    if(justPressed("g"))passBall(p2);
+    if(justPressed("t"))shoot(p2,true);
+    if(justPressed("r"))tackle(p2);
+  }else{
+    // CPU can attempt a shot or tackle when in range.
+    if(ball.owner===2 && nearest(p2)<p2.r+ball.r+10 && Math.random()<.025)shoot(p2,false);
+  }
+  if(p1.kickLock>0)p1.kickLock--;if(p2.kickLock>0)p2.kickLock--;
+  if(p1.tackle>0)p1.tackle--;if(p2.tackle>0)p2.tackle--;
+  // Player-to-player contact prevents overlap.
+  const dx=p2.x-p1.x,dy=p2.y-p1.y,dist=Math.hypot(dx,dy),min=p1.r+p2.r+1;
+  if(dist<min){const n=norm(dx,dy),push=(min-dist)/2;p1.x-=n.x*push;p1.y-=n.y*push;p2.x+=n.x*push;p2.y+=n.y*push;}
+  moveBall(dt);updateTimer(now);
 }
-
-function pausaMedioTiempo() {
-    isHalfTimePaused = true;
-    isPaused = true;
-    if (halfTimeNotice) halfTimeNotice.classList.remove("hidden");
-    if (pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
-
-    let cd = 30;
-    if (halfTimeNotice) halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
-
-    halfTimeTimer = setInterval(() => {
-        cd--;
-        if (halfTimeNotice) halfTimeNotice.textContent = `⏸️ Descanso del Partido (Reanudación en ${cd}s)`;
-        if (cd <= 0) {
-            clearInterval(halfTimeTimer);
-            cerrarPausa();
-        }
-    }, 1000);
+function loop(now){
+  const dt=clamp((now-lastFrame)/16.67||1,.2,2.2);lastFrame=now;
+  update(dt,now);drawGame();prevKeys={...keys};
+  raf=requestAnimationFrame(loop);
 }
-
-function abrirPausa() {
-    isPaused = true;
-    if (halfTimeNotice) halfTimeNotice.classList.add("hidden");
-    if (pauseMenuOverlay) pauseMenuOverlay.classList.remove("hidden");
+function startMatch(){
+  if(raf)cancelAnimationFrame(raf);
+  mode=$("gameModeSelect").value;matchSeconds=Number($("durationSelect").value)||180;timeLeft=matchSeconds;lastSecond=performance.now();score1=score2=0;updateScore();matchOver=false;paused=false;running=true;
+  badge1.src=$("p1BadgeSelect").value;badge2.src=$("cpuBadgeSelect").value;
+  const a=allPlayers[Number($("playerSelect").value)]||{name:"Jugador 1",rating:80};
+  const b=mode==="2P"?(allPlayers[Number($("player2Select").value)]||{name:"Jugador 2",rating:80}):null;
+  $("scoreName1").textContent=(a.name||"Jugador 1").toLocaleUpperCase().slice(0,20);
+  $("scoreName2").textContent=mode==="2P"?(b.name||"Jugador 2").toLocaleUpperCase().slice(0,20):"CPU";
+  $("scoreBadge1").src=$("p1BadgeSelect").value;$("scoreBadge2").src=$("cpuBadgeSelect").value;
+  $("gameTimer").textContent=`${String(Math.floor(timeLeft/60)).padStart(2,"0")}:${String(timeLeft%60).padStart(2,"0")}`;
+  $("pauseGameBtn").disabled=false;$("pauseGameBtn").textContent="Ⅱ Pausar";$("gameOverlay").classList.add("hidden");
+  p1=makePlayer(270,H/2,1);p2=makePlayer(W-270,H/2,2);resetPositions();keys=Object.create(null);prevKeys=Object.create(null);
+  setStatus(mode==="2P"?"Partido local iniciado. ¡Que gane el mejor!":"Partido iniciado. La CPU ajustará su presión según la dificultad.");
+  lastFrame=performance.now();raf=requestAnimationFrame(loop);
 }
-
-function cerrarPausa() {
-    if (halfTimeTimer) clearInterval(halfTimeTimer);
-    isPaused = false;
-    isHalfTimePaused = false;
-    if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
-}
-
-function rendirsePartido() {
-    cerrarPausa();
-    clearInterval(timerInterval);
-    cancelAnimationFrame(gameLoopId);
-    scoreCpu += 3;
-    mostrarResumenFinal();
-}
-
-function ejecutarSustitucion() {
-    const target = subTargetSelect ? subTargetSelect.value : "P1";
-    const replacementIdx = replacementSelect ? replacementSelect.value : 0;
-    const playerNewData = todosLosJugadores[replacementIdx];
-
-    if (!playerNewData) return;
-
-    if (target === "P1") {
-        team1.main.name = playerNewData.name;
-        team1.main.rating = playerNewData.rating;
-        team1.main.baseSpeed = 3.5 + (team1.main.rating / 100) * 2.2;
-        team1.main.hp = 100;
-        team1.main.nitro = 100;
-        team1.main.stunnedUntil = 0;
-        hasPromptedSubP1 = false;
-    } else {
-        team2.main.name = playerNewData.name;
-        team2.main.rating = playerNewData.rating;
-        team2.main.baseSpeed = 3.5 + (team2.main.rating / 100) * 2.2;
-        team2.main.hp = 100;
-        team2.main.nitro = 100;
-        team2.main.stunnedUntil = 0;
-        hasPromptedSubP2 = false;
-    }
-
-    if (substitutionsModal) substitutionsModal.classList.add("hidden");
-    cerrarPausa();
-}
-
-function resetPosiciones() {
-    if (!canvas) return;
-    team1.main.x = 180; team1.main.y = canvas.height / 2;
-    team1.defender.x = 110; team1.defender.y = canvas.height / 2;
-    team1.gk.x = 30; team1.gk.y = canvas.height / 2;
-
-    team2.main.x = 620; team2.main.y = canvas.height / 2;
-    team2.defender.x = 690; team2.defender.y = canvas.height / 2;
-    team2.gk.x = 770; team2.gk.y = canvas.height / 2;
-
-    ball.x = canvas.width / 2;
-    ball.y = canvas.height / 2;
-    ball.vx = 0;
-    ball.vy = 0;
-}
-
-function bucleJuego() {
-    if (!isPaused) {
-        actualizarJuego();
-        dibujarJuego();
-    }
-    gameLoopId = requestAnimationFrame(bucleJuego);
-}
-
-function actualizarJuego() {
-    if (!canvas) return;
-    const now = Date.now();
-
-    if (team1.main.hp < 100) team1.main.hp = Math.min(100, team1.main.hp + 0.05);
-    if (team2.main.hp < 100) team2.main.hp = Math.min(100, team2.main.hp + 0.05);
-
-    if (team1.main.hp <= 0 && !hasPromptedSubP1 && !isPaused) {
-        hasPromptedSubP1 = true;
-        if (subTargetSelect) subTargetSelect.value = "P1";
-        const subReason = document.getElementById("subReasonText");
-        if (subReason) subReason.textContent = `⚠️ ¡${team1.main.name} está agotado! Realiza un cambio:`;
-        abrirPausa();
-        if (pauseMenuOverlay) pauseMenuOverlay.classList.add("hidden");
-        if (substitutionsModal) substitutionsModal.classList.remove("hidden");
-    }
-
-    // P1 CONTROLES
-    if (now > team1.main.stunnedUntil) {
-        let dx1 = 0, dy1 = 0;
-        if (keys["w"] || keys["W"]) dy1 -= 1;
-        if (keys["s"] || keys["S"]) dy1 += 1;
-        if (keys["a"] || keys["A"]) dx1 -= 1;
-        if (keys["d"] || keys["D"]) dx1 += 1;
-
-        if (keys["q"] || keys["Q"]) {
-            if (team1.main.nitro > 0) {
-                team1.main.speed = team1.main.baseSpeed * 1.6;
-                team1.main.nitro = Math.max(0, team1.main.nitro - 0.8);
-            } else team1.main.speed = team1.main.baseSpeed;
-        } else {
-            team1.main.speed = team1.main.baseSpeed;
-            team1.main.nitro = Math.min(100, team1.main.nitro + 0.2);
-        }
-
-        if (dx1 !== 0 || dy1 !== 0) {
-            let mag = Math.hypot(dx1, dy1);
-            team1.main.lastDirX = dx1 / mag;
-            team1.main.lastDirY = dy1 / mag;
-            team1.main.x += (dx1 / mag) * team1.main.speed;
-            team1.main.y += (dy1 / mag) * team1.main.speed;
-        }
-    }
-
-    team1.main.x = Math.max(team1.main.radius, Math.min(canvas.width - team1.main.radius, team1.main.x));
-    team1.main.y = Math.max(team1.main.radius, Math.min(canvas.height - team1.main.radius, team1.main.y));
-
-    // P2 / CPU CONTROLES
-    if (now > team2.main.stunnedUntil) {
-        if (team2.main.isHuman) {
-            let dx2 = 0, dy2 = 0;
-            if (keys["ArrowUp"]) dy2 -= 1;
-            if (keys["ArrowDown"]) dy2 += 1;
-            if (keys["ArrowLeft"]) dx2 -= 1;
-            if (keys["ArrowRight"]) dx2 += 1;
-
-            if (keys["j"] || keys["J"]) {
-                if (team2.main.nitro > 0) {
-                    team2.main.speed = team2.main.baseSpeed * 1.6;
-                    team2.main.nitro = Math.max(0, team2.main.nitro - 0.8);
-                } else team2.main.speed = team2.main.baseSpeed;
-            } else {
-                team2.main.speed = team2.main.baseSpeed;
-                team2.main.nitro = Math.min(100, team2.main.nitro + 0.2);
-            }
-
-            if (dx2 !== 0 || dy2 !== 0) {
-                let mag = Math.hypot(dx2, dy2);
-                team2.main.lastDirX = dx2 / mag;
-                team2.main.lastDirY = dy2 / mag;
-                team2.main.x += (dx2 / mag) * team2.main.speed;
-                team2.main.y += (dy2 / mag) * team2.main.speed;
-            }
-        } else {
-            let targetX = ball.x;
-            let targetY = ball.y;
-
-            if (ball.x > canvas.width * 0.3) {
-                targetX = ball.x;
-                targetY = ball.y;
-            }
-
-            if (Math.hypot(ball.x - team2.main.x, ball.y - team2.main.y) > 120 && team2.main.nitro > 20) {
-                team2.main.speed = team2.main.baseSpeed * 1.4;
-                team2.main.nitro -= 0.4;
-            } else {
-                team2.main.speed = team2.main.baseSpeed;
-                team2.main.nitro = Math.min(100, team2.main.nitro + 0.2);
-            }
-
-            team2.main.x += (targetX - team2.main.x) * team2.main.reactionRate;
-            team2.main.y += (targetY - team2.main.y) * team2.main.reactionRate;
-        }
-    }
-
-    team2.main.x = Math.max(team2.main.radius, Math.min(canvas.width - team2.main.radius, team2.main.x));
-    team2.main.y = Math.max(team2.main.radius, Math.min(canvas.height - team2.main.radius, team2.main.y));
-
-    // DEFENSA Y PORTERO
-    team1.defender.y += (ball.y - team1.defender.y) * 0.05;
-    team2.defender.y += (ball.y - team2.defender.y) * 0.05;
-
-    team1.gk.y += (ball.y - team1.gk.y) * 0.08;
-    team2.gk.y += (ball.y - team2.gk.y) * 0.08;
-    team1.gk.y = Math.max(canvas.height / 2 - 50, Math.min(canvas.height / 2 + 50, team1.gk.y));
-    team2.gk.y = Math.max(canvas.height / 2 - 50, Math.min(canvas.height / 2 + 50, team2.gk.y));
-
-    // COLISIÓN SÓLIDA
-    resolverColisionSolida(team1.main, team2.main);
-    resolverColisionSolida(team1.main, team2.defender);
-    resolverColisionSolida(team2.main, team1.defender);
-
-    // BALÓN PEGADO
-    let distP1Ball = Math.hypot(ball.x - team1.main.x, ball.y - team1.main.y);
-    let distP2Ball = Math.hypot(ball.x - team2.main.x, ball.y - team2.main.y);
-    let pelotaPegada = false;
-
-    if (keys["Shift"] && distP1Ball < team1.main.radius + ball.radius + 15 && now > team1.main.stunnedUntil) {
-        pelotaPegada = true;
-        ball.x = team1.main.x + team1.main.lastDirX * (team1.main.radius + ball.radius + 2);
-        ball.y = team1.main.y + team1.main.lastDirY * (team1.main.radius + ball.radius + 2);
-        ball.vx = 0; ball.vy = 0;
-    }
-    
-    const cpuCanControl = (!team2.main.isHuman && difficultySelect && (difficultySelect.value === "normal" || difficultySelect.value === "difícil"));
-    if ((keys["k"] || keys["K"] || cpuCanControl) && !pelotaPegada && distP2Ball < team2.main.radius + ball.radius + 15 && now > team2.main.stunnedUntil) {
-        pelotaPegada = true;
-        ball.x = team2.main.x + team2.main.lastDirX * (team2.main.radius + ball.radius + 2);
-        ball.y = team2.main.y + team2.main.lastDirY * (team2.main.radius + ball.radius + 2);
-        ball.vx = 0; ball.vy = 0;
-    }
-
-    // ENTRADAS
-    if ((keys["x"] || keys["X"]) && now > team1.main.stunnedUntil) {
-        if (distP2Ball < team1.main.radius + ball.radius + 30) {
-            let angle = Math.atan2(ball.y - team1.main.y, ball.x - team1.main.x);
-            ball.vx = Math.cos(angle) * 15;
-            ball.vy = Math.sin(angle) * 15;
-            team1.main.hp = Math.max(0, team1.main.hp - 5);
-        }
-    }
-
-    const cpuDefend = (!team2.main.isHuman);
-    if ((keys["m"] || keys["M"] || cpuDefend) && now > team2.main.stunnedUntil) {
-        if (distP1Ball < team2.main.radius + ball.radius + 30) {
-            let angle = Math.atan2(ball.y - team2.main.x, ball.x - team2.main.x);
-            ball.vx = Math.cos(angle) * 15;
-            ball.vy = Math.sin(angle) * 15;
-            team2.main.hp = Math.max(0, team2.main.hp - 5);
-        }
-    }
-
-    // FÍSICAS DE LA PELOTA
-    if (!pelotaPegada) {
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-        ball.vx *= ball.friction;
-        ball.vy *= ball.friction;
-
-        let spd = Math.hypot(ball.vx, ball.vy);
-        if (spd > ball.maxSpeed) {
-            ball.vx = (ball.vx / spd) * ball.maxSpeed;
-            ball.vy = (ball.vy / spd) * ball.maxSpeed;
-        }
-
-        if (ball.y - ball.radius <= 0) {
-            ball.y = ball.radius;
-            ball.vy = Math.abs(ball.vy) * 0.85;
-        } else if (ball.y + ball.radius >= canvas.height) {
-            ball.y = canvas.height - ball.radius;
-            ball.vy = -Math.abs(ball.vy) * 0.85;
-        }
-
-        resolverColisionEntidadBalon(team1.main);
-        resolverColisionEntidadBalon(team1.defender);
-        resolverColisionEntidadBalon(team1.gk);
-
-        resolverColisionEntidadBalon(team2.main);
-        resolverColisionEntidadBalon(team2.defender);
-        resolverColisionEntidadBalon(team2.gk);
-    }
-
-    // TIROS
-    if ((keys["c"] || keys["C"]) && distP1Ball < team1.main.radius + ball.radius + 20) {
-        let angle = Math.atan2(ball.y - team1.main.y, ball.x - team1.main.x);
-        ball.vx = Math.cos(angle) * 10;
-        ball.vy = Math.sin(angle) * 10;
-    }
-
-    if ((keys["l"] || keys["L"]) && distP2Ball < team2.main.radius + ball.radius + 20) {
-        let angle = Math.atan2(ball.y - team2.main.y, ball.x - team2.main.x);
-        ball.vx = Math.cos(angle) * 10;
-        ball.vy = Math.sin(angle) * 10;
-    }
-
-    if ((keys["z"] || keys["Z"]) && (now - team1.main.lastPowerShot >= POWERSHOT_COOLDOWN) && distP1Ball < team1.main.radius + ball.radius + 25) {
-        let angle = Math.atan2(ball.y - team1.main.y, ball.x - team1.main.x);
-        ball.vx = Math.cos(angle) * 17.5;
-        ball.vy = Math.sin(angle) * 17.5;
-        team1.main.lastPowerShot = now;
-    }
-
-    const cpuPowerShot = (!team2.main.isHuman && ball.x < canvas.width * 0.4);
-    if (((keys["p"] || keys["P"]) || cpuPowerShot) && (now - team2.main.lastPowerShot >= POWERSHOT_COOLDOWN) && distP2Ball < team2.main.radius + ball.radius + 25) {
-        let angle = Math.atan2(ball.y - team2.main.y, ball.x - team2.main.x);
-        ball.vx = Math.cos(angle) * 17.5;
-        ball.vy = Math.sin(angle) * 17.5;
-        team2.main.lastPowerShot = now;
-    }
-
-    // GOLES
-    const goalTop = canvas.height / 2 - 60;
-    const goalBottom = canvas.height / 2 + 60;
-
-    if (ball.x - ball.radius <= 0) {
-        if (ball.y >= goalTop && ball.y <= goalBottom) {
-            scoreCpu++;
-            team2.main.goals++;
-            resetPosiciones();
-        } else {
-            ball.x = ball.radius;
-            ball.vx = Math.abs(ball.vx) * 0.85;
-        }
-    }
-
-    if (ball.x + ball.radius >= canvas.width) {
-        if (ball.y >= goalTop && ball.y <= goalBottom) {
-            scoreP1++;
-            team1.main.goals++;
-            resetPosiciones();
-        } else {
-            ball.x = canvas.width - ball.radius;
-            ball.vx = -Math.abs(ball.vx) * 0.85;
-        }
-    }
-}
-
-function resolverColisionSolida(p1, p2) {
-    let dx = p2.x - p1.x;
-    let dy = p2.y - p1.y;
-    let dist = Math.hypot(dx, dy);
-    let minDist = p1.radius + p2.radius;
-
-    if (dist < minDist && dist > 0.001) {
-        let overlap = minDist - dist;
-        let nx = dx / dist;
-        let ny = dy / dist;
-
-        p1.x -= nx * (overlap / 2);
-        p1.y -= ny * (overlap / 2);
-        p2.x += nx * (overlap / 2);
-        p2.y += ny * (overlap / 2);
-    }
-}
-
-function resolverColisionEntidadBalon(entidad) {
-    let dx = ball.x - entidad.x;
-    let dy = ball.y - entidad.y;
-    let distancia = Math.hypot(dx, dy);
-    let minDist = entidad.radius + ball.radius;
-
-    if (distancia < minDist) {
-        let angle = Math.atan2(dy, dx);
-        let fuerza = 5;
-        ball.vx = Math.cos(angle) * fuerza;
-        ball.vy = Math.sin(angle) * fuerza;
-        ball.x = entidad.x + Math.cos(angle) * minDist;
-        ball.y = entidad.y + Math.sin(angle) * minDist;
-    }
-}
-
-function mostrarResumenFinal() {
-    isPaused = true;
-    const scoreTitle = document.getElementById("finalScoreTitle");
-    if (scoreTitle) scoreTitle.textContent = `${team1.main.name} ${scoreP1} - ${scoreCpu} ${team2.main.name}`;
-
-    let ratingP1 = (7.0 + team1.main.goals * 1.5).toFixed(1);
-    let ratingP2 = (7.0 + team2.main.goals * 1.5).toFixed(1);
-
-    const p1NameElem = document.getElementById("p1BestName");
-    const p1RatingElem = document.getElementById("p1BestRating");
-    if (p1NameElem) p1NameElem.textContent = team1.main.name;
-    if (p1RatingElem) p1RatingElem.textContent = `VALORACIÓN: ${ratingP1}`;
-
-    const p2NameElem = document.getElementById("p2BestName");
-    const p2RatingElem = document.getElementById("p2BestRating");
-    if (p2NameElem) p2NameElem.textContent = team2.main.name;
-    if (p2RatingElem) p2RatingElem.textContent = `VALORACIÓN: ${ratingP2}`;
-
-    const mvpNameElem = document.getElementById("mvpName");
-    const mvpScoreElem = document.getElementById("mvpScore");
-
-    if (parseFloat(ratingP1) >= parseFloat(ratingP2)) {
-        if (mvpNameElem) mvpNameElem.textContent = team1.main.name;
-        if (mvpScoreElem) mvpScoreElem.textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP1}`;
-    } else {
-        if (mvpNameElem) mvpNameElem.textContent = team2.main.name;
-        if (mvpScoreElem) mvpScoreElem.textContent = `VALORACIÓN DE RENDIMIENTO: ${ratingP2}`;
-    }
-
-    if (finalSummaryOverlay) finalSummaryOverlay.classList.remove("hidden");
-}
-
-function dibujarJuego() {
-    if (!ctx || !canvas) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (imgPitch.complete && imgPitch.naturalWidth > 0) {
-        ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.fillStyle = "#2e8b57";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    dibujarJugadorCanvas(team1.main, imgP1Badge, "#00ffff");
-    dibujarJugadorCanvas(team1.defender, imgP1Badge, "#00cccc");
-    dibujarJugadorCanvas(team1.gk, imgP1Badge, "#ffcc00");
-
-    dibujarJugadorCanvas(team2.main, imgCpuBadge, "#ff0055");
-    dibujarJugadorCanvas(team2.defender, imgCpuBadge, "#cc0044");
-    dibujarJugadorCanvas(team2.gk, imgCpuBadge, "#ffcc00");
-
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px Poppins, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`${team1.main.name} ${scoreP1} - ${scoreCpu} ${team2.main.name}`, canvas.width / 2, 35);
-
-    ctx.fillStyle = "#00ffff";
-    ctx.fillRect(20, 15, team1.main.nitro * 1.2, 6);
-    ctx.fillStyle = "#2ecc71";
-    ctx.fillRect(20, 24, team1.main.hp * 1.2, 6);
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeRect(20, 15, 120, 15);
-
-    ctx.fillStyle = "#ff0055";
-    ctx.fillRect(canvas.width - 140, 15, team2.main.nitro * 1.2, 6);
-    ctx.fillStyle = "#2ecc71";
-    ctx.fillRect(canvas.width - 140, 24, team2.main.hp * 1.2, 6);
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeRect(canvas.width - 140, 15, 120, 15);
-}
-
-function dibujarJugadorCanvas(entidad, imgEscudo, colorBorde) {
-    if (!ctx) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
-    ctx.clip();
-
-    if (imgEscudo.complete && imgEscudo.naturalWidth > 0) {
-        ctx.drawImage(imgEscudo, entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
-    } else {
-        ctx.fillStyle = colorBorde;
-        ctx.fillRect(entidad.x - entidad.radius, entidad.y - entidad.radius, entidad.radius * 2, entidad.radius * 2);
-    }
-    ctx.restore();
-
-    ctx.beginPath();
-    ctx.arc(entidad.x, entidad.y, entidad.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = colorBorde;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    if (entidad.hp !== undefined) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(entidad.x - 20, entidad.y - entidad.radius - 12, 40, 5);
-        ctx.fillStyle = entidad.hp > 30 ? "#2ecc71" : "#e53935";
-        ctx.fillRect(entidad.x - 20, entidad.y - entidad.radius - 12, (entidad.hp / 100) * 40, 5);
-    }
-}
-
-if (searchButton) searchButton.addEventListener("click", buscarJugador);
-if (searchInput) searchInput.addEventListener("keyup", () => { buscarJugador(); });
-if (nextBtn) {
-    nextBtn.addEventListener("click", () => {
-        if (offset + limite < jugadoresFiltrados.length) {
-            offset += limite;
-            renderizarPaginaActual();
-        }
-    });
-}
-if (previousBtn) {
-    previousBtn.addEventListener("click", () => {
-        if (offset - limite >= 0) {
-            offset -= limite;
-            renderizarPaginaActual();
-        }
-    });
-}
-
-cargarDatosAPI();
+$("startGameBtn").addEventListener("click",startMatch);
+$("pauseGameBtn").addEventListener("click",()=>{
+  if(!running||matchOver)return;paused=!paused;
+  if(paused){$("pauseGameBtn").textContent="▶ Reanudar";$("gameOverlay").classList.remove("hidden");$("gameOverlay").innerHTML='<div class="overlay-card"><div class="overlay-ball">Ⅱ</div><h3>Partido pausado</h3><p>Pulsa Reanudar para continuar.</p></div>';setStatus("Partido pausado.");}
+  else{$("pauseGameBtn").textContent="Ⅱ Pausar";$("gameOverlay").classList.add("hidden");lastFrame=performance.now();lastSecond=performance.now();setStatus("Partido reanudado.");}
+});
+$("gameModeSelect").addEventListener("change",()=>{const two=$("gameModeSelect").value==="2P";$("p2PlayerGroup").classList.toggle("hidden",!two);$("difficultyGroup").classList.toggle("hidden",two);});
+window.addEventListener("keydown",e=>{
+  const key=e.key===" "?" ":e.key.length===1?e.key.toLowerCase():e.key;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
+  keys[key]=true;
+});
+window.addEventListener("keyup",e=>{const key=e.key===" "?" ":e.key.length===1?e.key.toLowerCase():e.key;keys[key]=false;});
+window.addEventListener("blur",()=>{keys=Object.create(null);});
+$("p1BadgeSelect").addEventListener("change",()=>{badge1.src=$("p1BadgeSelect").value;$("scoreBadge1").src=badge1.src;drawGame();});
+$("cpuBadgeSelect").addEventListener("change",()=>{badge2.src=$("cpuBadgeSelect").value;$("scoreBadge2").src=badge2.src;drawGame();});
+$("difficultySelect").addEventListener("change",()=>setStatus("Dificultad CPU: "+$("difficultySelect").selectedOptions[0].textContent+". Se aplica al siguiente movimiento."));
+fetch("dls26-cards.json").then(r=>{if(!r.ok)throw new Error("No se pudo cargar dls26-cards.json");return r.json();}).then(initCards).catch(()=>{$("errorMessage").classList.remove("hidden");$("errorMessage").textContent="No se pudo cargar la base de cartas. Comprueba que dls26-cards.json esté en la misma carpeta y abre el proyecto mediante GitHub Pages o un servidor local.";allPlayers=[];populatePlayerSelects();});
+drawGame();
+})();

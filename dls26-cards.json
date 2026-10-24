@@ -3,7 +3,7 @@
     { "title": "Good Feeling", "file": "./sound 1 dls.mp3" },
     { "title": "Supernatural", "file": "./sound 2 dls.mp3" },
     { "title": "Fale Então", "file": "./sound 3 dls.mp3" },
-    { "title": "7Son", "file": "./sound 4 dls.mp3" }
+    { "title": "7 Son", "file": "./sound 4 dls.mp3" }
   ],
   "players": [
     {
@@ -495,7 +495,7 @@
       "position": "LD",
       "country": {
         "name": "Nueva Zelanda",
-        "flag": "🇳ℤ"
+        "flag": "🇳🇿"
       },
       "team": "Selección de Nueva Zelanda",
       "cardType": "HIDDEN",
