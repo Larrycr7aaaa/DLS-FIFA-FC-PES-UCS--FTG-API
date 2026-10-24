@@ -5,6 +5,7 @@ let jugadoresFiltrados = [];
 let offset = 0;
 const limite = 8;
 
+// DOM Elements
 const playerContainer = document.getElementById("playerContainer");
 const detailContainer = document.getElementById("detailContainer");
 const previousBtn = document.getElementById("previousBtn");
@@ -15,12 +16,12 @@ const loading = document.getElementById("loading");
 const errorMessage = document.getElementById("errorMessage");
 const playerCounter = document.getElementById("playerCounter");
 
+// Music Player
 const audioTrack = document.getElementById("audioTrack");
 const playPauseBtn = document.getElementById("playPauseBtn");
 const trackSelect = document.getElementById("trackSelect");
 const trackTitle = document.getElementById("trackTitle");
 
-// REPRODUCTOR
 function inicializarReproductor(playlist) {
     if (!playlist || playlist.length === 0) return;
     trackSelect.innerHTML = "";
@@ -35,24 +36,37 @@ function inicializarReproductor(playlist) {
 }
 
 playPauseBtn.addEventListener("click", () => {
-    if (audioTrack.paused) { audioTrack.play(); playPauseBtn.textContent = "⏸"; }
-    else { audioTrack.pause(); playPauseBtn.textContent = "▶"; }
+    if (audioTrack.paused) {
+        audioTrack.play();
+        playPauseBtn.textContent = "⏸";
+    } else {
+        audioTrack.pause();
+        playPauseBtn.textContent = "▶";
+    }
 });
 
+function mostrarLoading() { loading.classList.remove("hidden"); }
+function ocultarLoading() { loading.classList.add("hidden"); }
+
 async function cargarDatosAPI() {
-    loading.classList.remove("hidden");
+    mostrarLoading();
     try {
         const respuesta = await fetch(URL);
         const data = await respuesta.json();
-        todosLosJugadores = data.players || data;
+        if (data.playlist) {
+            inicializarReproductor(data.playlist);
+            todosLosJugadores = data.players || [];
+        } else {
+            todosLosJugadores = Array.isArray(data) ? data : [];
+        }
         jugadoresFiltrados = [...todosLosJugadores];
-        if (data.playlist) inicializarReproductor(data.playlist);
-        
         pobladorSelectorJugadores();
         renderizarPaginaActual();
         inicializarJuegoCanvas();
-    } catch (e) { console.error("Error al cargar la base de datos", e); }
-    loading.classList.add("hidden");
+    } catch (error) {
+        console.error(error);
+    }
+    ocultarLoading();
 }
 
 function renderizarPaginaActual() {
@@ -69,13 +83,13 @@ function crearCard(player) {
     card.classList.add("card");
     card.innerHTML = `
         <div class="card-img-wrapper">
-            <img src="${player.image}" alt="${player.name}" onerror="this.src='./images_2.png';">
+            <img src="${player.image}" alt="${player.name}" onerror="this.src='./download.jpg';">
         </div>
         <div class="card-body">
             <h3>${player.name}</h3>
             <p><strong>${player.team}</strong> - ${player.position}</p>
             <p><strong>OVR:</strong> ${player.rating}</p>
-            <button class="btn-info" style="margin-top:8px; width:100%; padding:6px; background:#00ffff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Ver Info</button>
+            <button class="btn-info">Ver Info</button>
         </div>
     `;
     card.querySelector(".btn-info").addEventListener("click", () => mostrarDetalle(player));
@@ -84,136 +98,178 @@ function crearCard(player) {
 
 function mostrarDetalle(player) {
     detailContainer.innerHTML = `
-        <h2>${player.name} ${player.country?.flag || ''}</h2>
+        <h2>${player.name}</h2>
         <p><strong>Equipo:</strong> ${player.team}</p>
         <p><strong>Posición:</strong> ${player.position}</p>
-        <p><strong>Media:</strong> ${player.rating}</p>
-        <p><strong>Carta:</strong> ${player.cardType} (${player.year})</p>
+        <p><strong>Valoración:</strong> ${player.rating}</p>
     `;
 }
 
-function buscarJugador() {
-    const busqueda = searchInput.value.trim().toLowerCase();
-    jugadoresFiltrados = todosLosJugadores.filter(p =>
-        p.name?.toLowerCase().includes(busqueda) ||
-        p.team?.toLowerCase().includes(busqueda) ||
-        p.position?.toLowerCase().includes(busqueda) ||
-        String(p.rating).includes(busqueda)
-    );
-    offset = 0;
-    renderizarPaginaActual();
-}
-
-searchButton.addEventListener("click", buscarJugador);
-searchInput.addEventListener("keyup", buscarJugador);
-
 // ===============================================
-// MOTOR DE JUEGO DLS 7v7 CON BALÓN PARADO COMPLETO
+// LÓGICA DEL JUEGO
 // ===============================================
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let imgPitch = new Image(); imgPitch.src = './FUT_2.jpg';
-let imgGoal = new Image(); imgGoal.src = './PEN.png';
-let imgP1Badge = new Image();
-let imgCpuBadge = new Image();
-
 let gameLoopId = null;
 let timerInterval = null;
 let matchTime = 180;
+let isPaused = false;
+
 let keys = {};
-
 let scoreP1 = 0;
-let scoreCpu = 0;
+let scoreP2 = 0;
 
-// ESTADOS DEL PARTIDO
-// NORMAL, FREE_KICK, PENALTY, CORNER, GOAL_KICK, INDIRECT_FREE_KICK
-let matchState = 'NORMAL';
-let takerPlayer = null;
-let restartTimer = 0;
+let statsGame = {
+    p1Possession: 0, p2Possession: 0,
+    p1Shots: 0, p2Shots: 0,
+    p1Tackles: 0, p2Tackles: 0,
+    p1Passes: 0, p2Passes: 0,
+    p1Time: 0, p2Time: 0,
+    mvp: null
+};
 
-let team1 = [];
-let team2 = [];
+let team1 = { gk: null, def: null, med: null, del: null };
+let team2 = { gk: null, def: null, med: null, del: null };
 
-let ball = { x: 450, y: 250, radius: 7, vx: 0, vy: 0, friction: 0.95, holder: null };
-
-function crearJugador(data, role, defaultX, defaultY, teamId) {
+function crearEntidad(data, role, defaultX, defaultY) {
     return {
         x: defaultX, y: defaultY,
         baseX: defaultX, baseY: defaultY,
-        radius: 14,
-        speed: data ? 3.2 + (data.rating / 100) * 1.5 : 3.8,
+        radius: 16,
+        speed: 3.5,
         name: data ? data.name : role,
         rating: data ? data.rating : 80,
+        image: data ? data.image : '',
         role: role,
-        team: teamId,
-        stamina: 100
+        energy: 100,
+        nitro: 100,
+        lastPowerShot: 0,
+        lastDirX: 0, lastDirY: 0
     };
 }
 
+let ball = { x: 425, y: 240, radius: 9, vx: 0, vy: 0, friction: 0.94, holder: null };
+
 function pobladorSelectorJugadores() {
-    const container = document.getElementById("p1SquadSelectors");
-    if (!container) return;
-    container.innerHTML = "";
+    const p1Gk = document.getElementById("p1GkSelect");
+    const p1Def = document.getElementById("p1DefSelect");
+    const p1Med = document.getElementById("p1MedSelect");
+    const p1Del = document.getElementById("p1DelSelect");
+    const p2Gk = document.getElementById("p2GkSelect");
+    const p2Def = document.getElementById("p2DefSelect");
+    const p2Med = document.getElementById("p2MedSelect");
+    const p2Del = document.getElementById("p2DelSelect");
 
-    const roles = ["GK", "DEF 1", "DEF 2", "MED 1", "MED 2", "DEL 1", "DEL 2"];
-    roles.forEach((r, idx) => {
-        const div = document.createElement("div");
-        div.innerHTML = `<label style="font-size:0.7rem;">${r}:</label><select id="p1Sel_${idx}"></select>`;
-        container.appendChild(div);
+    const selects = [p1Gk, p1Def, p1Med, p1Del, p2Gk, p2Def, p2Med, p2Del];
+    selects.forEach(s => s.innerHTML = "");
 
-        const sel = div.querySelector("select");
-        todosLosJugadores.forEach((p, i) => {
-            const opt = document.createElement("option");
-            opt.value = i;
-            opt.textContent = `${p.name} (${p.position})`;
-            if (i === idx) opt.selected = true;
-            sel.appendChild(opt);
-        });
+    todosLosJugadores.forEach((p, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `${p.name} (${p.rating} - ${p.position})`;
+        const pos = (p.position || "").toUpperCase();
+
+        if (pos === "GK" || pos === "POR") {
+            p1Gk.appendChild(opt.cloneNode(true));
+            p2Gk.appendChild(opt.cloneNode(true));
+        } else if (["DFC", "DEF", "LD", "LI"].includes(pos)) {
+            p1Def.appendChild(opt.cloneNode(true));
+            p2Def.appendChild(opt.cloneNode(true));
+        } else if (["MC", "MED", "MCO", "MCD"].includes(pos)) {
+            p1Med.appendChild(opt.cloneNode(true));
+            p2Med.appendChild(opt.cloneNode(true));
+        } else {
+            p1Del.appendChild(opt.cloneNode(true));
+            p2Del.appendChild(opt.cloneNode(true));
+        }
+    });
+
+    pobladorSubstituciones();
+}
+
+function pobladorSubstituciones() {
+    const subP1Def = document.getElementById("subP1Def");
+    const subP1Med = document.getElementById("subP1Med");
+    const subP1Del = document.getElementById("subP1Del");
+    const subP2Def = document.getElementById("subP2Def");
+    const subP2Med = document.getElementById("subP2Med");
+    const subP2Del = document.getElementById("subP2Del");
+
+    const subSelects = [subP1Def, subP1Med, subP1Del, subP2Def, subP2Med, subP2Del];
+    subSelects.forEach(s => s.innerHTML = "");
+
+    todosLosJugadores.forEach((p, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `${p.name} (${p.rating})`;
+        subSelects.forEach(s => s.appendChild(opt.cloneNode(true)));
     });
 }
 
 function inicializarJuegoCanvas() {
     window.addEventListener("keydown", e => { keys[e.key] = true; });
     window.addEventListener("keyup", e => { keys[e.key] = false; });
-    document.getElementById("startGameBtn")?.addEventListener("click", reiniciarPartido);
+
+    document.getElementById("startGameBtn").addEventListener("click", reiniciarPartido);
+    document.getElementById("pauseBtn").addEventListener("click", pausarJuego);
+    document.getElementById("resumeBtn").addEventListener("click", reanudarJuego);
+
+    document.getElementById("gestionarEquipoBtn").addEventListener("click", () => {
+        document.getElementById("pauseModal").classList.add("hidden");
+        document.getElementById("subModal").classList.remove("hidden");
+    });
+
+    document.getElementById("closeSubBtn").addEventListener("click", () => {
+        document.getElementById("subModal").classList.add("hidden");
+        document.getElementById("pauseModal").classList.remove("hidden");
+    });
+
+    document.getElementById("applySubP1").addEventListener("click", () => {
+        const defP = todosLosJugadores[document.getElementById("subP1Def").value];
+        const medP = todosLosJugadores[document.getElementById("subP1Med").value];
+        const delP = todosLosJugadores[document.getElementById("subP1Del").value];
+        if (defP) team1.def = crearEntidad(defP, 'DEF', team1.def.x, team1.def.y);
+        if (medP) team1.med = crearEntidad(medP, 'MED', team1.med.x, team1.med.y);
+        if (delP) team1.del = crearEntidad(delP, 'DEL', team1.del.x, team1.del.y);
+        alert("¡Sustituciones P1 realizadas!");
+    });
+
+    document.getElementById("estadisticasBtn").addEventListener("click", mostrarModalStats);
+    document.getElementById("closeStatsBtn").addEventListener("click", () => {
+        document.getElementById("statsModal").classList.add("hidden");
+    });
 }
 
 function reiniciarPartido() {
-    imgP1Badge.src = document.getElementById("p1BadgeSelect").value;
-    imgCpuBadge.src = document.getElementById("cpuBadgeSelect").value;
+    const p1Gk = todosLosJugadores[document.getElementById("p1GkSelect").value];
+    const p1Def = todosLosJugadores[document.getElementById("p1DefSelect").value];
+    const p1Med = todosLosJugadores[document.getElementById("p1MedSelect").value];
+    const p1Del = todosLosJugadores[document.getElementById("p1DelSelect").value];
 
-    const getP1Data = (idx) => todosLosJugadores[document.getElementById(`p1Sel_${idx}`)?.value || idx];
+    const p2Gk = todosLosJugadores[document.getElementById("p2GkSelect").value];
+    const p2Def = todosLosJugadores[document.getElementById("p2DefSelect").value];
+    const p2Med = todosLosJugadores[document.getElementById("p2MedSelect").value];
+    const p2Del = todosLosJugadores[document.getElementById("p2DelSelect").value];
 
-    // ALINEACIÓN 7v7 TEAM 1
-    team1 = [
-        crearJugador(getP1Data(0), 'GK', 60, 250, 1),
-        crearJugador(getP1Data(1), 'DEF', 180, 150, 1),
-        crearJugador(getP1Data(2), 'DEF', 180, 350, 1),
-        crearJugador(getP1Data(3), 'MED', 320, 180, 1),
-        crearJugador(getP1Data(4), 'MED', 320, 320, 1),
-        crearJugador(getP1Data(5), 'DEL', 420, 200, 1),
-        crearJugador(getP1Data(6), 'DEL', 420, 300, 1)
-    ];
+    team1.gk = crearEntidad(p1Gk, 'GK', 50, 240);
+    team1.def = crearEntidad(p1Def, 'DEF', 180, 240);
+    team1.med = crearEntidad(p1Med, 'MED', 300, 240);
+    team1.del = crearEntidad(p1Del, 'DEL', 380, 240);
 
-    // ALINEACIÓN 7v7 TEAM 2 (CPU / P2)
-    team2 = [
-        crearJugador(todosLosJugadores[13] || null, 'GK', 840, 250, 2),
-        crearJugador(todosLosJugadores[17] || null, 'DEF', 720, 150, 2),
-        crearJugador(todosLosJugadores[29] || null, 'DEF', 720, 350, 2),
-        crearJugador(todosLosJugadores[2] || null, 'MED', 580, 180, 2),
-        crearJugador(todosLosJugadores[3] || null, 'MED', 580, 320, 2),
-        crearJugador(todosLosJugadores[7] || null, 'DEL', 480, 200, 2),
-        crearJugador(todosLosJugadores[8] || null, 'DEL', 480, 300, 2)
-    ];
+    team2.gk = crearEntidad(p2Gk, 'GK', 800, 240);
+    team2.def = crearEntidad(p2Def, 'DEF', 670, 240);
+    team2.med = crearEntidad(p2Med, 'MED', 550, 240);
+    team2.del = crearEntidad(p2Del, 'DEL', 470, 240);
 
-    scoreP1 = 0; scoreCpu = 0;
-    matchState = 'NORMAL';
+    scoreP1 = 0; scoreP2 = 0;
+    statsGame = { p1Possession: 0, p2Possession: 0, p1Shots: 0, p2Shots: 0, p1Tackles: 0, p2Tackles: 0, p1Passes: 0, p2Passes: 0, p1Time: 0, p2Time: 0 };
     resetPosiciones();
     iniciarTemporizador();
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
+    isPaused = false;
     bucleJuego();
 }
 
@@ -221,233 +277,227 @@ function iniciarTemporizador() {
     clearInterval(timerInterval);
     matchTime = 180;
     timerInterval = setInterval(() => {
-        if (matchTime > 0) {
+        if (!isPaused) {
             matchTime--;
             let m = Math.floor(matchTime / 60);
             let s = matchTime % 60;
             document.getElementById("gameTimer").textContent = `⏱️ Tiempo: ${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-        } else {
-            clearInterval(timerInterval);
-            cancelAnimationFrame(gameLoopId);
-            alert(`¡Fin del partido! Resultado final: P1 ${scoreP1} - ${scoreCpu} P2`);
+            if (matchTime <= 0) {
+                clearInterval(timerInterval);
+                cancelAnimationFrame(gameLoopId);
+                mostrarModalStats();
+            }
         }
     }, 1000);
 }
 
+function pausarJuego() {
+    isPaused = true;
+    document.getElementById("p1PauseScore").textContent = scoreP1;
+    document.getElementById("p2PauseScore").textContent = scoreP2;
+    document.getElementById("pauseModal").classList.remove("hidden");
+}
+
+function reanudarJuego() {
+    isPaused = false;
+    document.getElementById("pauseModal").classList.add("hidden");
+}
+
 function resetPosiciones() {
-    ball.x = 450; ball.y = 250; ball.vx = 0; ball.vy = 0; ball.holder = null;
+    ball.x = 425; ball.y = 240; ball.vx = 0; ball.vy = 0; ball.holder = null;
+    team1.gk.x = 50; team1.gk.y = 240;
+    team1.def.x = 180; team1.def.y = 240;
+    team1.med.x = 300; team1.med.y = 240;
+    team1.del.x = 380; team1.del.y = 240;
 
-    // Posiciones iniciales
-    const p1X = [60, 180, 180, 320, 320, 420, 420];
-    const p1Y = [250, 150, 350, 180, 320, 200, 300];
-    team1.forEach((p, i) => { p.x = p1X[i]; p.y = p1Y[i]; });
-
-    const p2X = [840, 720, 720, 580, 580, 480, 480];
-    const p2Y = [250, 150, 350, 180, 320, 200, 300];
-    team2.forEach((p, i) => { p.x = p2X[i]; p.y = p2Y[i]; });
+    team2.gk.x = 800; team2.gk.y = 240;
+    team2.def.x = 670; team2.def.y = 240;
+    team2.med.x = 550; team2.med.y = 240;
+    team2.del.x = 470; team2.del.y = 240;
 }
 
 function bucleJuego() {
-    actualizarJuego();
-    dibujarJuego();
+    if (!isPaused) {
+        actualizarJuego();
+        dibujarJuego();
+    }
     gameLoopId = requestAnimationFrame(bucleJuego);
 }
 
 function actualizarJuego() {
-    // GESTIÓN DE BALÓN PARADO
-    if (matchState !== 'NORMAL') {
-        actualizarBalonParado();
-        return;
+    // --- CONTROLES PORTEROS ---
+    if (keys["f"] || keys["F"]) team1.gk.x = Math.min(100, team1.gk.x + 3);
+    if (keys["g"] || keys["G"]) team1.gk.x = Math.max(20, team1.gk.x - 3);
+    if (keys["l"] || keys["L"]) team2.gk.x = Math.max(750, team2.gk.x - 3);
+    if (keys["k"] || keys["K"]) team2.gk.x = Math.min(830, team2.gk.x + 3);
+
+    // --- JUGADOR CONTROLADO P1 (Delantero) ---
+    let speed1 = team1.del.speed * (team1.del.energy / 100);
+    if (keys["q"] || keys["Q"]) {
+        if (team1.del.nitro > 0) { speed1 *= 1.5; team1.del.nitro -= 0.5; }
+    } else { team1.del.nitro = Math.min(100, team1.del.nitro + 0.2); }
+
+    if (keys["w"] || keys["W"]) team1.del.y -= speed1;
+    if (keys["s"] || keys["S"]) team1.del.y += speed1;
+    if (keys["a"] || keys["A"]) team1.del.x -= speed1;
+    if (keys["d"] || keys["D"]) team1.del.x += speed1;
+
+    team1.del.energy = Math.max(10, team1.del.energy - 0.005);
+
+    // AI COMPAÑEROS P1
+    movimientoAIAvanzado(team1.def, ball, 150, 600, 1);
+    movimientoAIAvanzado(team1.med, ball, 250, 700, 1);
+
+    // --- CONTROLES / AI P2 ---
+    const is2P = document.getElementById("gameModeSelect").value === "2P";
+    if (is2P) {
+        let speed2 = team2.del.speed * (team2.del.energy / 100);
+        if (keys["ArrowUp"]) team2.del.y -= speed2;
+        if (keys["ArrowDown"]) team2.del.y += speed2;
+        if (keys["ArrowLeft"]) team2.del.x -= speed2;
+        if (keys["ArrowRight"]) team2.del.x += speed2;
+        movimientoAIAvanzado(team2.def, ball, 250, 700, -1);
+        movimientoAIAvanzado(team2.med, ball, 150, 600, -1);
+    } else {
+        movimientoAIAvanzado(team2.def, ball, 200, 650, -1);
+        movimientoAIAvanzado(team2.med, ball, 150, 550, -1);
+        movimientoAIAvanzado(team2.del, ball, 50, 450, -1);
+
+        // Pase CPU inteligente
+        if (ball.holder === team2.del && Math.random() < 0.01) {
+            let target = Math.random() > 0.5 ? team2.med : team2.def;
+            let angle = Math.atan2(target.y - team2.del.y, target.x - team2.del.x);
+            ball.holder = null;
+            ball.vx = Math.cos(angle) * 8;
+            ball.vy = Math.sin(angle) * 8;
+            statsGame.p2Passes++;
+        }
     }
 
-    // CONTROLES P1 (Delantero principal 5)
-    let p1Capt = team1[5];
-    let spd = p1Capt.speed;
-    if (keys["ArrowUp"]) p1Capt.y -= spd;
-    if (keys["ArrowDown"]) p1Capt.y += spd;
-    if (keys["ArrowLeft"]) p1Capt.x -= spd;
-    if (keys["ArrowRight"]) p1Capt.x += spd;
-
-    p1Capt.x = Math.max(15, Math.min(885, p1Capt.x));
-    p1Capt.y = Math.max(15, Math.min(485, p1Capt.y));
-
-    // MOVIMIENTO IA COMPAÑEROS P1 Y CPU
-    team1.forEach((p, i) => { if (i !== 5) moverIAPosicional(p, ball); });
-    team2.forEach(p => moverIAPosicional(p, ball));
-
-    // FÍSICAS DE BALÓN Y POSESIÓN
-    if (ball.holder) {
-        ball.x = ball.holder.x + (ball.holder.team === 1 ? 12 : -12);
-        ball.y = ball.holder.y;
-
-        // TIRO Y PASE P1
-        if (ball.holder === p1Capt) {
-            if (keys[" "]) { // Tiro
-                ball.holder = null;
-                ball.vx = 14; ball.vy = (Math.random() - 0.5) * 4;
-            } else if (keys["Shift"]) { // Pase / Centro
-                ball.holder = null;
-                ball.vx = 9; ball.vy = (Math.random() - 0.5) * 2;
-            }
+    // DISPAROS P1 (E) / P2 (M)
+    if (keys["e"] || keys["E"]) {
+        if (Math.hypot(ball.x - team1.del.x, ball.y - team1.del.y) < 30) {
+            ball.holder = null;
+            ball.vx = 12; ball.vy = (Math.random() - 0.5) * 4;
+            statsGame.p1Shots++;
         }
+    }
+
+    if (keys["m"] || keys["M"]) {
+        if (Math.hypot(ball.x - team2.del.x, ball.y - team2.del.y) < 30) {
+            ball.holder = null;
+            ball.vx = -12; ball.vy = (Math.random() - 0.5) * 4;
+            statsGame.p2Shots++;
+        }
+    }
+
+    // FÍSICAS BALÓN
+    if (ball.holder) {
+        ball.x = ball.holder.x + 12;
+        ball.y = ball.holder.y;
     } else {
         ball.x += ball.vx; ball.y += ball.vy;
         ball.vx *= ball.friction; ball.vy *= ball.friction;
 
-        // Capturar posesión
-        [...team1, ...team2].forEach(p => {
-            if (Math.hypot(ball.x - p.x, ball.y - p.y) < p.radius + ball.radius + 2) {
-                ball.holder = p;
-            }
-        });
+        // Rebotes
+        if (ball.y <= 10 || ball.y >= canvas.height - 10) ball.vy *= -1;
     }
 
-    // REGISTRO DE FALTAS, CÓRNERS, SAQUES DE META Y OUTS
-    comprobarLímitesYFaltas();
-}
-
-function comprobarLímitesYFaltas() {
-    // FUERA DE BANDA / TIRO LIBRE INDIRECTO
-    if (ball.y <= 10 || ball.y >= 490) {
-        prepararBalonParado('INDIRECT_FREE_KICK', ball.x, ball.y <= 10 ? 20 : 480, 1);
-        return;
-    }
-
-    // GOLES O BALÓN FUERA EN LÍNEAS DE FONDO
-    if (ball.x <= 15) {
-        if (ball.y > 180 && ball.y < 320) { // Gol P2
-            scoreCpu++;
-            resetPosiciones();
-        } else {
-            // Córner o Saque de Meta
-            if (ball.vx < 0) prepararBalonParado('GOAL_KICK', 50, 250, 1);
-            else prepararBalonParado('CORNER', 20, 20, 2);
+    // Detección Posesión / Colisiones
+    const todos = [team1.gk, team1.def, team1.med, team1.del, team2.gk, team2.def, team2.med, team2.del];
+    todos.forEach(p => {
+        if (p && Math.hypot(ball.x - p.x, ball.y - p.y) < p.radius + ball.radius) {
+            ball.holder = p;
         }
-    }
+    });
 
-    if (ball.x >= 885) {
-        if (ball.y > 180 && ball.y < 320) { // Gol P1
-            scoreP1++;
-            resetPosiciones();
-        } else {
-            if (ball.vx > 0) prepararBalonParado('GOAL_KICK', 850, 250, 2);
-            else prepararBalonParado('CORNER', 880, 20, 1);
-        }
-    }
+    if (ball.x < 425) statsGame.p2Time++; else statsGame.p1Time++;
 
-    // DETECCIÓN DE ENTRADA / TIRO LIBRE O PENALTI
-    if (keys["x"] || keys["X"]) {
-        team2.forEach(p => {
-            if (Math.hypot(p.x - team1[5].x, p.y - team1[5].y) < 22) {
-                if (p.x > 700 && p.y > 120 && p.y < 380) {
-                    prepararBalonParado('PENALTY', 780, 250, 1);
-                } else {
-                    prepararBalonParado('FREE_KICK', p.x, p.y, 1);
-                }
-            }
-        });
+    // GOLES
+    if (ball.x <= 10) {
+        if (ball.y > 180 && ball.y < 300) { scoreP2++; resetPosiciones(); }
+        else { ball.vx *= -1; }
+    }
+    if (ball.x >= canvas.width - 10) {
+        if (ball.y > 180 && ball.y < 300) { scoreP1++; resetPosiciones(); }
+        else { ball.vx *= -1; }
     }
 }
 
-function prepararBalonParado(tipo, x, y, equipoAtacante) {
-    matchState = tipo;
-    ball.x = x; ball.y = y; ball.vx = 0; ball.vy = 0; ball.holder = null;
-    takerPlayer = equipoAtacante === 1 ? team1[5] : team2[5];
-    takerPlayer.x = x - 25; takerPlayer.y = y;
-    restartTimer = 180; // 3 segundos para ejecutar
-}
-
-function actualizarBalonParado() {
-    restartTimer--;
-    if (keys[" "] || keys["Shift"] || restartTimer <= 0) {
-        let pot = keys[" "] ? 15 : 9;
-        let angle = matchState === 'PENALTY' ? 0 : Math.atan2(250 - ball.y, 900 - ball.x);
-
-        ball.vx = Math.cos(angle) * pot;
-        ball.vy = Math.sin(angle) * pot;
-        matchState = 'NORMAL';
-    }
-}
-
-function moverIAPosicional(p, b) {
-    let targetX = p.baseX + (b.x - 450) * 0.3;
-    let targetY = p.baseY + (b.y - 250) * 0.3;
-
-    p.x += (targetX - p.x) * 0.04;
-    p.y += (targetY - p.y) * 0.04;
+function movimientoAIAvanzado(entidad, balon, minY, maxY, dir) {
+    if (!entidad) return;
+    let targetX = dir === 1 ? Math.min(balon.x - 40, maxY) : Math.max(balon.x + 40, minY);
+    let targetY = balon.y;
+    entidad.x += (targetX - entidad.x) * 0.04;
+    entidad.y += (targetY - entidad.y) * 0.04;
 }
 
 function dibujarJuego() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // CAMPO
-    if (imgPitch.complete && imgPitch.naturalWidth > 0) {
-        ctx.drawImage(imgPitch, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.fillStyle = "#2b824c";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    // Campo
+    ctx.fillStyle = "#2e8b57";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, 60, 0, Math.PI * 2); ctx.stroke();
 
-    // PORTERÍAS REALES DLS
-    if (imgGoal.complete && imgGoal.naturalWidth > 0) {
-        ctx.drawImage(imgGoal, -10, 175, 30, 150);
-        ctx.drawImage(imgGoal, canvas.width - 20, 175, 30, 150);
-    }
+    // Dibujar Jugadores
+    [team1.gk, team1.def, team1.med, team1.del].forEach(p => dibujarJugador(p, "#00ffff"));
+    [team2.gk, team2.def, team2.med, team2.del].forEach(p => dibujarJugador(p, "#ff0055"));
 
-    // DIBUJAR EQUIPOS 7v7
-    team1.forEach(p => dibujarJugador(p, "#00ffff", imgP1Badge));
-    team2.forEach(p => dibujarJugador(p, "#ff0055", imgCpuBadge));
-
-    // BALÓN
+    // Balón
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff"; ctx.fill();
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
 
-    // INDICADOR BALÓN PARADO Y SCOREBOARD DLS
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 18px Poppins";
-    ctx.fillText(`P1: ${scoreP1}  |  P2: ${scoreCpu}`, canvas.width / 2 - 50, 30);
-
-    if (matchState !== 'NORMAL') {
-        ctx.fillStyle = "#ffcc00";
-        ctx.font = "bold 16px Poppins";
-        ctx.fillText(`¡${matchState.replace(/_/g, ' ')}! Presiona ESPACIO o SHIFT`, canvas.width / 2 - 150, 60);
-    }
-
-    // RADAR TÁCTICO DLS
-    dibujarRadarDLS();
+    // Marcador Canvas
+    ctx.fillStyle = "#fff"; ctx.font = "bold 18px Poppins";
+    ctx.fillText(`P1: ${scoreP1} - ${scoreP2} P2`, canvas.width / 2 - 40, 30);
 }
 
-function dibujarJugador(p, color, badgeImg) {
+function dibujarJugador(p, color) {
+    if (!p) return;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = color; ctx.fill(); ctx.stroke();
 
-    if (badgeImg.complete && badgeImg.naturalWidth > 0) {
-        ctx.drawImage(badgeImg, p.x - 8, p.y - 8, 16, 16);
-    }
+    // Barra de energía
+    ctx.fillStyle = "#00ff00";
+    ctx.fillRect(p.x - 12, p.y - 22, (p.energy / 100) * 24, 4);
+    ctx.strokeStyle = "#000"; ctx.strokeRect(p.x - 12, p.y - 22, 24, 4);
 }
 
-function dibujarRadarDLS() {
-    let rx = canvas.width / 2 - 60;
-    let ry = canvas.height - 45;
-    let rw = 120, rh = 35;
+function mostrarModalStats() {
+    document.getElementById("stP1Score").textContent = scoreP1;
+    document.getElementById("stP2Score").textContent = scoreP2;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(rx, ry, rw, rh);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.strokeRect(rx, ry, rw, rh);
+    let totalT = statsGame.p1Time + statsGame.p2Time || 1;
+    let p1P = Math.round((statsGame.p1Time / totalT) * 100);
+    document.getElementById("p1Poss").textContent = `${p1P}%`;
+    document.getElementById("p2Poss").textContent = `${100 - p1P}%`;
 
-    team1.forEach(p => {
-        ctx.fillStyle = "#00ffff";
-        ctx.fillRect(rx + (p.x / canvas.width) * rw, ry + (p.y / canvas.height) * rh, 3, 3);
-    });
-    team2.forEach(p => {
-        ctx.fillStyle = "#ff0055";
-        ctx.fillRect(rx + (p.x / canvas.width) * rw, ry + (p.y / canvas.height) * rh, 3, 3);
-    });
+    document.getElementById("p1Shots").textContent = statsGame.p1Shots;
+    document.getElementById("p2Shots").textContent = statsGame.p2Shots;
+
+    // Determinar MVP
+    let mvp = scoreP1 >= scoreP2 ? team1.del : team2.del;
+    document.getElementById("mvpName").textContent = mvp.name;
+    document.getElementById("mvpRole").textContent = `Rol: ${mvp.role}`;
+    document.getElementById("mvpImg").src = mvp.image || './download.jpg';
+
+    document.getElementById("pauseModal").classList.add("hidden");
+    document.getElementById("statsModal").classList.remove("hidden");
 }
+
+searchButton.addEventListener("click", () => {
+    const val = searchInput.value.toLowerCase();
+    jugadoresFiltrados = todosLosJugadores.filter(p => p.name.toLowerCase().includes(val));
+    offset = 0;
+    renderizarPaginaActual();
+});
+
+nextBtn.addEventListener("click", () => { offset += limite; renderizarPaginaActual(); });
+previousBtn.addEventListener("click", () => { offset -= limite; renderizarPaginaActual(); });
 
 cargarDatosAPI();
